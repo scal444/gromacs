@@ -125,7 +125,7 @@ int gmx_rama(int argc, char* argv[]);
 
 int gmx_rotmat(int argc, char* argv[]);
 
-int gmx_rms(int argc, char* argv[]);
+// int gmx_rms(int argc, char* argv[]);
 
 int gmx_rmsdist(int argc, char* argv[]);
 
