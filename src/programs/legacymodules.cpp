@@ -339,10 +339,6 @@ void registerLegacyModules(gmx::CommandLineModuleManager* manager)
                    "Calculate principal axes of inertia for a group of atoms");
     registerModule(manager, &gmx_rama, "rama", "Compute Ramachandran plots");
     registerModule(manager,
-                   &gmx_rms,
-                   "rms",
-                   "Calculate RMSDs with a reference structure and RMSD matrices");
-    registerModule(manager,
                    &gmx_rmsdist,
                    "rmsdist",
                    "Calculate atom pair distances averaged with power -2, -3 or -6");

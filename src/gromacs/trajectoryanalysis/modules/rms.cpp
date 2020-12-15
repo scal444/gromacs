@@ -48,12 +48,15 @@
 #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/device_stream.h"
+#include "gromacs/gpu_utils/transformations.cuh"
+#include "gromacs/gpu_utils/typecasts.cuh"
 #include "gromacs/hardware/device_information.h"
 #include "gromacs/hardware/device_management.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/selection/selectionoption.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
+#include "gromacs/trajectory/trajectoryframe.h"
 
 namespace gmx::analysismodules
 {
@@ -82,9 +85,11 @@ private:
     SelectionList sel_;
 
     //! Buffer for reference positions
-    DeviceBuffer<RVec> reference_;
-    //! Buffers for coordinates to compare against reference.
-    std::vector<DeviceBuffer<RVec>> coord_buffers_;
+    DeviceBuffer<float3> reference_ = nullptr;
+    //! Buffer for all positions
+    DeviceBuffer<float3> all_positions_ = nullptr;
+    //! Indices for coordinates to compare against reference.
+    std::vector<DeviceBuffer<int>> coord_buffers_;
     //! Per-frame result
     AnalysisData rmsds_;
 };
@@ -112,7 +117,7 @@ void Rms::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
             "Selections to compute RMSDs for from the reference"));
 }
 
-void Rms::initAnalysis(const TrajectoryAnalysisSettings& settings, const TopologyInformation& /* top */)
+void Rms::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
 {
     DeviceContext dummy_context(DeviceInformation{});
     for (std::unique_ptr<DeviceInformation>& device : findDevices())
@@ -130,22 +135,49 @@ void Rms::initAnalysis(const TrajectoryAnalysisSettings& settings, const Topolog
     for (int i = 0; i < nSels; i++)
     {
         allocateDeviceBuffer(&coord_buffers_[i], sel_[i].posCount(), dummy_context);
+        copyToDeviceBuffer(&coord_buffers_[i], sel_[i].atomIndices().data(),0, sel_[i].posCount(),
+                           *stream_,  GpuApiCallBehavior::Sync, nullptr);
     }
 }
 
-void Rms::initAfterFirstFrame(const TrajectoryAnalysisSettings& settings, const t_trxframe& fr)
+void Rms::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
 {
+    DeviceContext dummy_context(DeviceInformation{});
+    // Set up all frames now that we know what they are. Could also get it from topo prolly.
+    allocateDeviceBuffer(&all_positions_, fr.natoms, dummy_context);
+
     // Here, put the reference data on the GPU.
+    copyToDeviceBuffer(&reference_, asConstFloat3(refSel_.coordinates().data()), 0,
+                       refSel_.posCount(), *stream_,
+                       GpuApiCallBehavior::Sync, nullptr);
+    // Center reference data
+    const float3 com = center_of_mass(reference_, nullptr, nullptr, refSel_.posCount());
+    translate(reference_, refSel_.posCount(),  {com.x * -1.0F, com.y * -1.0F, com.z * -1.0F});
 }
 
 
-void Rms::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* pbc, TrajectoryAnalysisModuleData* pdata)
+void Rms::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* pdata)
 {
-    // Copy new positions over.
+    AnalysisDataHandle   dh   = pdata->dataHandle(rmsds_);
+    dh.startFrame(frnr, fr.time);
 
+    // Copy ALL positions over. Future optimizations could be just the ones needed and a bunch of
+    // reindexing
+    copyToDeviceBuffer(&all_positions_, asConstFloat3(fr.x), 0, fr.natoms, *stream_, GpuApiCallBehavior::Sync, nullptr);
+
+    // Center new positions based on reference indices.
+    const float3 com = center_of_mass(all_positions_, nullptr, refSel_.atomIndices().data(), refSel_.posCount());
+    translate(all_positions_, fr.natoms, {com.x * -1.0F, com.y * -1.0F, com.z * -1.0F});
+    // Do fit/alignment to existing reference
+
+    // Do calculation
+
+    // DUMMY - frnr squared
+    dh.setPoint(0, frnr * frnr);
+    dh.finishFrame();
 }
 
-void Rms::finishAnalysis(int nframes) {
+void Rms::finishAnalysis(int gmx_unused nframes) {
 }
 
 void Rms::writeOutput() {}
