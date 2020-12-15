@@ -59,6 +59,7 @@ elseif(GMX_GPU_CUDA)
         gpu_utils.cu
         pinning.cu
         pmalloc_cuda.cu
+        transformations.cu
         )
     _gmx_add_files_to_property(CUDA_SOURCES
         device_stream_manager.cpp

@@ -33,45 +33,33 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 /*! \libinternal \file
- *  \brief Declare functions to be used to cast CPU types to compatible GPU types.
+ *  \brief Declares  3D transformation functions for coordinate systems.
  *
- *  \author Artem Zhmurov <zhmurov@gmail.com>
- *
+ *  \author Kevin Boyd <kevin44boyd@gmail.com>
  *  \inlibraryapi
  */
-#ifndef GMX_GPU_UTILS_TYPECASTS_CUH
-#define GMX_GPU_UTILS_TYPECASTS_CUH
 
-#include "gmxpre.h"
+#ifndef GROMACS_TRANSFORMATIONS_CUH
+#define GROMACS_TRANSFORMATIONS_CUH
 
-#include "gromacs/math/vectypes.h"
 
-/*! \brief Cast RVec buffer to float3 buffer.
+/*! \brief
+ * Calculates the center of mass for a set of positions.
  *
- * \param[in] in The RVec buffer to cast.
- *
- * \returns Buffer, casted to float3*.
+ * \param[in] positions      3D coordinates
+ * \param[in] masses         (optional) particle masses. If nullptr - will take unweighted average
+ * \param[in] indices        (optional) index array. Non-indexed positions/masses will be ignored
+ * \param[in] num_positions  number of indices, if indices != nullptr. Number of total atoms,
+ *                           indexed from 0 otherwise
  */
-static inline __host__ __device__ float3* asFloat3(gmx::RVec* const in)
-{
-    static_assert(sizeof(in[0]) == sizeof(float3),
-                  "Size of the host-side data-type is different from the size of the device-side "
-                  "counterpart.");
-    return reinterpret_cast<float3*>(in);
-}
+__host__ __device__ float3 center_of_mass( const float3 * positions, const float * masses, const int* indices, int num_positions);
 
-/*! \brief Cast rvec buffer to float3 buffer.
+/*! \brief
+ * Applies a 3D translation to the given coordinates
  *
- * \param[in] in The rvec buffer to cast.
- *
- * \returns Buffer, casted to float3*.
+ * \param[in] positions      3D coordinates
+ * \param[in] num_positions  The number of atoms to translate
+ * \param[in] translation    The distance to move
  */
-static inline __host__ __device__ const float3* asConstFloat3(const rvec* const in)
-{
-    static_assert(sizeof(in[0]) == sizeof(float3),
-                  "Size of the host-side data-type is different from the size of the device-side "
-                  "counterpart.");
-    return reinterpret_cast<const float3*>(in);
-}
-
-#endif // GMX_GPU_UTILS_TYPECASTS_CUH
+void translate(float3 * positions, int num_positions, float3 translation);
+#endif // GROMACS_TRANSFORMATIONS_CUH
