@@ -52,8 +52,7 @@
  * \param[in] num_positions  number of indices, if indices != nullptr. Number of total atoms,
  *                           indexed from 0 otherwise
  */
-__host__ __device__ float3 center_of_mass( const float3 * positions, const float * masses, const int* indices, int num_positions);
-
+__global__ void center_of_mass( const float3 * positions, const float * masses, const int* indices, int num_positions, float3 *com);
 /*! \brief
  * Applies a 3D translation to the given coordinates
  *
@@ -62,4 +61,8 @@ __host__ __device__ float3 center_of_mass( const float3 * positions, const float
  * \param[in] translation    The distance to move
  */
 void translate(float3 * positions, int num_positions, float3 translation);
+
+__global__ void create_rotation_matrix();
+
+__global__ void rotate()
 #endif // GROMACS_TRANSFORMATIONS_CUH

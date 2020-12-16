@@ -50,10 +50,11 @@
  * \param[in] indices        (optional) index array. Non-indexed positions/masses will be ignored
  * \param[in] num_positions  number of indices, if indices != nullptr. Number of total atoms,
  *                           indexed from 0 otherwise
+ * \param[out] com
  */
-__host__ __device__ float3 center_of_mass( const float3 * positions, const float * masses, const int* indices, const int num_positions)
+__global__ void center_of_mass( const float3 * positions, const float * masses, const int* indices, const int num_positions, float3 *com)
 {
-    float3 com = {0.0,0.0,0.0};
+    *com = {0.0,0.0,0.0};
     float total_mass = 0.0;
     // Mass-weighted COM
     if (masses != nullptr)
@@ -61,7 +62,7 @@ __host__ __device__ float3 center_of_mass( const float3 * positions, const float
         for (int i = 0; i < num_positions; i++)
         {
             const int idx = indices != nullptr ? indices[i] : i;
-            com += positions[idx] * masses[idx];
+            *com += positions[idx] * masses[idx];
             total_mass += masses[idx];
         }
     }
@@ -70,13 +71,12 @@ __host__ __device__ float3 center_of_mass( const float3 * positions, const float
         for (int i = 0; i < num_positions; i++)
         {
             const int idx = indices != nullptr ? indices[i] : i;
-            com += positions[idx];
+            *com += positions[idx];
         }
     }
     if (masses != nullptr) {
-        com /= total_mass;
+        *com /= total_mass;
     }
-    return com;
 }
 /*! \brief
  * Applies a 3D translation to the given coordinates
@@ -85,7 +85,7 @@ __host__ __device__ float3 center_of_mass( const float3 * positions, const float
  * \param[in] num_positions  The number of atoms to translate
  * \param[in] translation    The distance to move
  */
-__host__ __device__ void translate(float3 * positions, const int num_positions, const float3 translation)
+__global__ void translate(float3 * positions, const int num_positions, const float3 translation)
 {
     for (int i = 0; i < num_positions; i++)
     {
@@ -93,3 +93,4 @@ __host__ __device__ void translate(float3 * positions, const int num_positions, 
     }
 
 }
+

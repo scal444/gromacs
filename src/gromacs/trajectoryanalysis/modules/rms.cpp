@@ -45,6 +45,8 @@
 #include "rms.h"
 
 #include "gromacs/analysisdata/analysisdata.h"
+#include "gromacs/analysisdata/modules/average.h"
+#include "gromacs/analysisdata/modules/plot.h"
 #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/device_stream.h"
@@ -53,6 +55,7 @@
 #include "gromacs/hardware/device_information.h"
 #include "gromacs/hardware/device_management.h"
 #include "gromacs/options/basicoptions.h"
+#include "gromacs/options/filenameoption.h"
 #include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/selection/selectionoption.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
@@ -92,10 +95,16 @@ private:
     std::vector<DeviceBuffer<int>> coord_buffers_;
     //! Per-frame result
     AnalysisData rmsds_;
+
+    //! Output file
+    std::string out_file_;
 };
+
 
 Rms::Rms()
 {
+    rmsds_.setDataSetCount(1);
+    rmsds_.setColumnCount(0, 1);
     registerAnalysisDataset(&rmsds_, "rmsd");
 }
 
@@ -111,6 +120,12 @@ void Rms::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
     options->addOption(IntegerOption("gpu_id")
                                .store(&gpu_id_)
                                .description("Which GPU to run on"));
+    options->addOption(FileNameOption("o")
+                               .filetype(eftPlot)
+                               .outputFile()
+                               .store(&out_file_)
+                               .defaultBasename("rmsdout")
+                               .description("Average distances as function of time"));
     options->addOption(SelectionOption("ref").store(&refSel_).required().description(
             "Reference selection for pre-RMSD alignment"));
     options->addOption(SelectionOption("sel").storeVector(&sel_).required().multiValue().description(
@@ -119,6 +134,18 @@ void Rms::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
 
 void Rms::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
 {
+    // Set up output
+    auto plotm = std::make_shared<AnalysisDataPlotModule>(settings.plotSettings());
+    plotm->setFileName(out_file_);
+    plotm->setTitle("RMSD");
+    plotm->setXAxisIsTime();
+    plotm->setYLabel("RMSD (units)");
+    for (const auto& sel: sel_)
+    {
+        plotm->appendLegend(sel.name());
+    }
+    rmsds_.addModule(plotm);
+
     DeviceContext dummy_context(DeviceInformation{});
     for (std::unique_ptr<DeviceInformation>& device : findDevices())
     {
@@ -150,14 +177,21 @@ void Rms::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
     copyToDeviceBuffer(&reference_, asConstFloat3(refSel_.coordinates().data()), 0,
                        refSel_.posCount(), *stream_,
                        GpuApiCallBehavior::Sync, nullptr);
-    // Center reference data
-    const float3 com = center_of_mass(reference_, nullptr, nullptr, refSel_.posCount());
+    DeviceBuffer<float3> com_device = nullptr;
+
+    allocateDeviceBuffer(&com_device, 1, dummy_context);
+    center_of_mass(reference_, nullptr, nullptr, refSel_.posCount(), com_device);
+    float3 com;
+    copyFromDeviceBuffer(&com, &com_device, 0, 1, *stream_,
+                         GpuApiCallBehavior::Sync, nullptr);
     translate(reference_, refSel_.posCount(),  {com.x * -1.0F, com.y * -1.0F, com.z * -1.0F});
 }
 
 
 void Rms::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* pdata)
 {
+    DeviceContext dummy_context(DeviceInformation{});
+
     AnalysisDataHandle   dh   = pdata->dataHandle(rmsds_);
     dh.startFrame(frnr, fr.time);
 
@@ -166,7 +200,13 @@ void Rms::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, Tr
     copyToDeviceBuffer(&all_positions_, asConstFloat3(fr.x), 0, fr.natoms, *stream_, GpuApiCallBehavior::Sync, nullptr);
 
     // Center new positions based on reference indices.
-    const float3 com = center_of_mass(all_positions_, nullptr, refSel_.atomIndices().data(), refSel_.posCount());
+    DeviceBuffer<float3> com_device = nullptr;
+
+    allocateDeviceBuffer(&com_device, 1, dummy_context);
+    center_of_mass(all_positions_, nullptr, refSel_.atomIndices().data(), refSel_.posCount(), com_device);
+    float3 com;
+    copyFromDeviceBuffer(&com, &com_device, 0, 1, *stream_,
+                         GpuApiCallBehavior::Sync, nullptr);
     translate(all_positions_, fr.natoms, {com.x * -1.0F, com.y * -1.0F, com.z * -1.0F});
     // Do fit/alignment to existing reference
 
@@ -180,8 +220,17 @@ void Rms::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, Tr
 void Rms::finishAnalysis(int gmx_unused nframes) {
 }
 
-void Rms::writeOutput() {}
+void Rms::writeOutput() {
 
+}
+
+
+const char RmsInfo::name[]             = "rms";
+const char RmsInfo::shortDescription[] = "Compute root mean squared deviations";
+TrajectoryAnalysisModulePointer RmsInfo::create()
+{
+    return TrajectoryAnalysisModulePointer(new Rms);
+}
 
 
 
