@@ -34,20 +34,20 @@
  */
 /*! \internal \file
  * \brief
- * Declares trajectory analysis module for RMSD calculations.
+ * Declares trajectory analysis module for Mean Squared Displacement calculations.
  *
  * \author Kevin Boyd <kevin44boyd@gmail.com>
  * \ingroup module_trajectoryanalysis
  */
-#ifndef GMX_TRAJECTORYANALYSIS_MODULES_RMS_H
-#define GMX_TRAJECTORYANALYSIS_MODULES_RMS_H
+#ifndef GMX_TRAJECTORYANALYSIS_MODULES_MSD_H
+#define GMX_TRAJECTORYANALYSIS_MODULES_MSD_H
 
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 
 namespace gmx::analysismodules
 {
 
-class RmsInfo
+class MsdInfo
 {
 public:
     static const char                      name[];
@@ -57,4 +57,4 @@ public:
 
 } // namespace gmx::analysismodules
 
-#endif  // GMX_TRAJECTORYANALYSIS_MODULES_RMS_H
+#endif  // GMX_TRAJECTORYANALYSIS_MODULES_MSD_H
