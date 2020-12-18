@@ -103,7 +103,7 @@ int gmx_make_edi(int argc, char* argv[]);
 
 int gmx_mindist(int argc, char* argv[]);
 
-int gmx_msd(int argc, char* argv[]);
+// int gmx_msd(int argc, char* argv[]);
 
 int gmx_nmeig(int argc, char* argv[]);
 

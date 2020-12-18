@@ -620,7 +620,7 @@ int CommandLineModuleManager::runAsMainCMainWithSettings(int                  ar
 void CommandLineModuleGroupData::addModule(const char* name, const char* description)
 {
     CommandLineModuleMap::const_iterator moduleIter = allModules_.find(name);
-    GMX_RELEASE_ASSERT(moduleIter != allModules_.end(), "Non-existent module added to a group");
+    GMX_RELEASE_ASSERT(moduleIter != allModules_.end(), name);
     if (description == nullptr)
     {
         description = moduleIter->second->shortDescription();

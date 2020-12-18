@@ -277,7 +277,7 @@ void registerLegacyModules(gmx::CommandLineModuleManager* manager)
     registerModule(manager, &gmx_mdmat, "mdmat", "Calculate residue contact maps");
     registerModule(manager, &gmx_mindist, "mindist",
                    "Calculate the minimum distance between two groups");
-    registerModule(manager, &gmx_msd, "msd", "Calculates mean square displacements");
+    // registerModule(manager, &gmx_msd, "msd", "Calculates mean square displacements");
     registerModule(manager, &gmx_nmeig, "nmeig", "Diagonalize the Hessian for normal mode analysis");
     registerModule(manager, &gmx_nmens, "nmens",
                    "Generate an ensemble of structures from the normal modes");
@@ -389,7 +389,6 @@ void registerLegacyModules(gmx::CommandLineModuleManager* manager)
         gmx::CommandLineModuleGroup group = manager->addModuleGroup("Distances between structures");
         group.addModule("cluster");
         group.addModule("confrms");
-        group.addModule("rms");
         group.addModule("rmsf");
     }
     {
@@ -404,7 +403,6 @@ void registerLegacyModules(gmx::CommandLineModuleManager* manager)
         gmx::CommandLineModuleGroup group =
                 manager->addModuleGroup("Mass distribution properties over time");
         group.addModule("gyrate");
-        group.addModule("msd");
         group.addModule("polystat");
         group.addModule("rdf");
         group.addModule("rotacf");
