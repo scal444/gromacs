@@ -55,6 +55,7 @@
 #include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/hardware/device_information.h"
 #include "gromacs/hardware/device_management.h"
+#include "gromacs/math/vectypes.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/filenameoption.h"
 #include "gromacs/options/ioptionscontainer.h"
@@ -75,7 +76,21 @@ const float3* asConstFloat3(const rvec* const in)
     return reinterpret_cast<const float3*>(in);
 }
 
+std::vector<RVec> SquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
+    std::vector<RVec> results;
+    results.reserve(num_vals);
+    RVec displacement = {0,0,0};
+    for (int i = 0; i < num_vals; i++) {
+        // displacement = {c1[i].x - c2[i].x, c1[i].y - c2[i].y, c1[i].z - c2[i].z};
+        displacement = c1[i] - c2[i];
+        results[i] = scaleByVector(displacement, displacement);
+    }
+    return results;
 }
+
+
+
+}  // namespace
 
 class Msd : public TrajectoryAnalysisModule
 {
@@ -155,13 +170,16 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 {
     DeviceContext dummy_context(DeviceInformation{});
     natoms_ = sel_.posCount();
+    t0_ = fr.time;
 }
 
 
 void Msd::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* pdata)
 {
     DeviceContext dummy_context(DeviceInformation{});
-
+    if (!bRmod(fr.time, t0_, trestart_)) {
+        return;
+    }
     // Always copy over
     DeviceBuffer<float3> coords = nullptr;
     allocateDeviceBuffer(&coords,  natoms_, dummy_context);
@@ -170,13 +188,8 @@ void Msd::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, Tr
     // Kick off analysis
 
     // Free if not a restart frame
-    if (bRmod(fr.time, t0_, trestart_))
-    {
-        frame_holder_.push_back(coords);
-    } else {
-        // Make sure to modify this if analysis is made async
-        freeDeviceBuffer(&coords);
-    }
+    frame_holder_.push_back(coords);
+
 }
 
 void Msd::finishAnalysis(int gmx_unused nframes) {
@@ -187,7 +200,7 @@ void Msd::writeOutput() {
 }
 
 
-const char MsdInfo::name[]             = "Msd";
+const char MsdInfo::name[]             = "msd";
 const char MsdInfo::shortDescription[] = "Compute mean squared displacements";
 TrajectoryAnalysisModulePointer MsdInfo::create()
 {
