@@ -50,7 +50,7 @@
 #include "gromacs/analysisdata/modules/average.h"
 #include "gromacs/analysisdata/modules/plot.h"
 #include "gromacs/fileio/trxio.h"
-#include "gromacs/gpu_utils/devicebuffer.h"
+// #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/hardware/device_information.h"
@@ -68,6 +68,7 @@ namespace gmx::analysismodules
 
 namespace {
 
+/*
 const float3* asConstFloat3(const rvec* const in)
 {
     static_assert(sizeof(in[0]) == sizeof(float3),
@@ -75,17 +76,16 @@ const float3* asConstFloat3(const rvec* const in)
                   "counterpart.");
     return reinterpret_cast<const float3*>(in);
 }
+*/
 
-std::vector<RVec> SquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
-    std::vector<RVec> results;
-    results.reserve(num_vals);
-    RVec displacement = {0,0,0};
+real MeanSquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
+    real result = 0;
     for (int i = 0; i < num_vals; i++) {
         // displacement = {c1[i].x - c2[i].x, c1[i].y - c2[i].y, c1[i].z - c2[i].z};
-        displacement = c1[i] - c2[i];
-        results[i] = scaleByVector(displacement, displacement);
+        RVec displacement = c1[i] - c2[i];
+        result += displacement.dot(displacement);
     }
-    return results;
+    return result / num_vals;
 }
 
 
@@ -113,21 +113,27 @@ private:
     Selection sel_;
 
     //! Coordinates to do le msd.
-    std::deque<DeviceBuffer<float3>> frame_holder_;
+    // std::deque<DeviceBuffer<float3>> frame_holder_;
     //! Output file
     std::string out_file_;
 
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
     int trestart_ = 10;
-    real t0_ = 0;
+    long t0_ = 0;
+    long dt_ = 0;
     int natoms_ = 0;
+
+    // Coordinates - first indexed by frame, then by atom
+    std::vector<std::vector<RVec>> frames_;
+    // Timestamp associated with coordinates
+    std::vector<long> times_;
+    // Results - first indexed by tau, then just data points
+    std::vector<std::vector<real>> msds_;
 };
 
 
-Msd::Msd()
-{
-}
+Msd::Msd() = default;
 
 
 void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* settings)
@@ -170,25 +176,43 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 {
     DeviceContext dummy_context(DeviceInformation{});
     natoms_ = sel_.posCount();
-    t0_ = fr.time;
+    t0_ = std::round(fr.time);
 }
 
 
-void Msd::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* pdata)
+void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* gmx_unused pdata)
 {
     DeviceContext dummy_context(DeviceInformation{});
+    long time = std::round(fr.time);
     if (!bRmod(fr.time, t0_, trestart_)) {
         return;
     }
+
+    // Need to populate dt on frame 2;
+    if (dt_ == 0 && !times_.empty()) {
+        dt_ = time - times_[0];
+    }
+
+    std::vector<RVec> coords(sel_.coordinates().begin(), sel_.coordinates().end());
+
+    // For each preceding frame, calculate tau and do comparison.
+    // NOTE - as currently construed, one element is added to msds_ for each frame
+    msds_.emplace_back();
+    for (size_t i = 0; i < frames_.size(); i++) {
+        long tau_index = (time - times_[i]) / dt_;
+        msds_[tau_index].push_back(MeanSquaredDisplacement(coords.data(), frames_[i].data(), natoms_));
+    }
+
+    //
+    times_.push_back(time);
+    frames_.push_back(std::move(coords));
     // Always copy over
-    DeviceBuffer<float3> coords = nullptr;
-    allocateDeviceBuffer(&coords,  natoms_, dummy_context);
-    copyToDeviceBuffer(&coords, asConstFloat3(sel_.coordinates().data()), 0, natoms_, *stream_,  GpuApiCallBehavior::Sync, nullptr);
-
+    // DeviceBuffer<float3> coords = nullptr;
+    // allocateDeviceBuffer(&coords,  natoms_, dummy_context);
+    // copyToDeviceBuffer(&coords, asConstFloat3(sel_.coordinates().data()), 0, natoms_, *stream_,  GpuApiCallBehavior::Sync, nullptr);
     // Kick off analysis
-
     // Free if not a restart frame
-    frame_holder_.push_back(coords);
+    // frame_holder_.push_back(coords);
 
 }
 
@@ -196,7 +220,16 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
 }
 
 void Msd::writeOutput() {
-
+    long tau = times_[0];
+    for (gmx::ArrayRef<const real> msd_vals : msds_) {
+        real sum = 0.0;
+        for (real val : msd_vals) {
+            sum += val;
+        }
+        sum /= msd_vals.size();
+        fprintf(stdout, "MSD at tau %li = %f", tau, sum);
+        tau += dt_;
+    }
 }
 
 
