@@ -43,6 +43,7 @@
 #include "gmxpre.h"
 
 #include "msd.h"
+#include "msder.h"
 
 #include <deque>
 
@@ -50,7 +51,6 @@
 #include "gromacs/analysisdata/modules/average.h"
 #include "gromacs/analysisdata/modules/plot.h"
 #include "gromacs/fileio/trxio.h"
-// #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/hardware/device_information.h"
@@ -61,6 +61,7 @@
 #include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/selection/selectionoption.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
+#include "gromacs/trajectoryanalysis/modules/msder.h"
 #include "gromacs/trajectory/trajectoryframe.h"
 
 namespace gmx::analysismodules
@@ -77,18 +78,6 @@ const float3* asConstFloat3(const rvec* const in)
     return reinterpret_cast<const float3*>(in);
 }
 */
-
-real MeanSquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
-    real result = 0;
-    for (int i = 0; i < num_vals; i++) {
-        // displacement = {c1[i].x - c2[i].x, c1[i].y - c2[i].y, c1[i].z - c2[i].z};
-        RVec displacement = c1[i] - c2[i];
-        result += displacement.dot(displacement);
-    }
-    return result / num_vals;
-}
-
-
 
 }  // namespace
 
@@ -122,10 +111,8 @@ private:
     int trestart_ = 10;
     long t0_ = 0;
     long dt_ = 0;
-    int natoms_ = 0;
-
-    // Coordinates - first indexed by frame, then by atom
-    std::vector<std::vector<RVec>> frames_;
+    // int natoms_ = 0;
+    std::unique_ptr<BufferManager> manager_;
     // Timestamp associated with coordinates
     std::vector<long> times_;
     // Results - first indexed by tau, then just data points
@@ -175,8 +162,8 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
 {
     DeviceContext dummy_context(DeviceInformation{});
-    natoms_ = sel_.posCount();
     t0_ = std::round(fr.time);
+    manager_ = std::make_unique<BufferManager>(sel_.posCount());
 }
 
 
@@ -192,20 +179,19 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
     if (dt_ == 0 && !times_.empty()) {
         dt_ = time - times_[0];
     }
-
-    std::vector<RVec> coords(sel_.coordinates().begin(), sel_.coordinates().end());
-
+    std::vector<float3> local_coords(reinterpret_cast<const float3*>(&sel_.coordinates()[0]),
+                                     reinterpret_cast<const float3*>(&sel_.coordinates()[0]) + sel_.posCount());
+    manager_->AddFrame(&local_coords[0]);
     // For each preceding frame, calculate tau and do comparison.
     // NOTE - as currently construed, one element is added to msds_ for each frame
     msds_.emplace_back();
-    for (size_t i = 0; i < frames_.size(); i++) {
+    for (int i = 0; i < frnr; i++) {
         long tau_index = (time - times_[i]) / dt_;
-        msds_[tau_index].push_back(MeanSquaredDisplacement(coords.data(), frames_[i].data(), natoms_));
+        msds_[tau_index].push_back(manager_->GetMsd(tau_index, frnr));
     }
 
     //
     times_.push_back(time);
-    frames_.push_back(std::move(coords));
     // Always copy over
     // DeviceBuffer<float3> coords = nullptr;
     // allocateDeviceBuffer(&coords,  natoms_, dummy_context);

@@ -80,3 +80,8 @@ endif()
 if (BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+
+gmx_add_libgromacs_sources(
+		modules/msd.cu
+)
