@@ -50,11 +50,6 @@
 #include "gromacs/analysisdata/modules/average.h"
 #include "gromacs/analysisdata/modules/plot.h"
 #include "gromacs/fileio/trxio.h"
-// #include "gromacs/gpu_utils/devicebuffer.h"
-#include "gromacs/gpu_utils/device_context.h"
-#include "gromacs/gpu_utils/device_stream.h"
-#include "gromacs/hardware/device_information.h"
-#include "gromacs/hardware/device_management.h"
 #include "gromacs/math/vectypes.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/filenameoption.h"
@@ -68,27 +63,14 @@ namespace gmx::analysismodules
 
 namespace {
 
-/*
-const float3* asConstFloat3(const rvec* const in)
-{
-    static_assert(sizeof(in[0]) == sizeof(float3),
-                  "Size of the host-side data-type is different from the size of the device-side "
-                  "counterpart.");
-    return reinterpret_cast<const float3*>(in);
-}
-*/
-
 real MeanSquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
     real result = 0;
     for (int i = 0; i < num_vals; i++) {
-        // displacement = {c1[i].x - c2[i].x, c1[i].y - c2[i].y, c1[i].z - c2[i].z};
         RVec displacement = c1[i] - c2[i];
         result += displacement.dot(displacement);
     }
     return result / num_vals;
 }
-
-
 
 }  // namespace
 
@@ -104,16 +86,10 @@ public:
     void finishAnalysis(int nframes) override;
     void writeOutput() override;
 private:
-    //! GPU to run on.
-    int gpu_id_ = 0;
-    //! GPU stream
-    std::unique_ptr<DeviceStream> stream_ = nullptr;
 
     //! Selections for rdf output
     Selection sel_;
 
-    //! Coordinates to do le msd.
-    // std::deque<DeviceBuffer<float3>> frame_holder_;
     //! Output file
     std::string out_file_;
 
@@ -144,9 +120,6 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
 
     settings->setHelpText(desc);
 
-    options->addOption(IntegerOption("gpu_id")
-                               .store(&gpu_id_)
-                               .description("Which GPU to run on"));
     options->addOption(FileNameOption("o")
                                .filetype(eftPlot)
                                .outputFile()
@@ -160,21 +133,11 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
 
 void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
 {
-    DeviceContext dummy_context(DeviceInformation{});
-    for (std::unique_ptr<DeviceInformation>& device : findDevices())
-    {
-        if (device->id == gpu_id_) {
-            setActiveDevice(*device);
-            stream_ = std::make_unique<DeviceStream>(dummy_context, DeviceStreamPriority::High, false);
-            break;
-        }
-    }
-    GMX_ASSERT(stream_ != nullptr, "Didn't initiate cuda stream.");
+
 }
 
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
 {
-    DeviceContext dummy_context(DeviceInformation{});
     natoms_ = sel_.posCount();
     t0_ = std::round(fr.time);
 }
@@ -182,7 +145,6 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 
 void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* gmx_unused pdata)
 {
-    DeviceContext dummy_context(DeviceInformation{});
     long time = std::round(fr.time);
     if (!bRmod(fr.time, t0_, trestart_)) {
         return;
@@ -203,17 +165,8 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         msds_[tau_index].push_back(MeanSquaredDisplacement(coords.data(), frames_[i].data(), natoms_));
     }
 
-    //
     times_.push_back(time);
     frames_.push_back(std::move(coords));
-    // Always copy over
-    // DeviceBuffer<float3> coords = nullptr;
-    // allocateDeviceBuffer(&coords,  natoms_, dummy_context);
-    // copyToDeviceBuffer(&coords, asConstFloat3(sel_.coordinates().data()), 0, natoms_, *stream_,  GpuApiCallBehavior::Sync, nullptr);
-    // Kick off analysis
-    // Free if not a restart frame
-    // frame_holder_.push_back(coords);
-
 }
 
 void Msd::finishAnalysis(int gmx_unused nframes) {
