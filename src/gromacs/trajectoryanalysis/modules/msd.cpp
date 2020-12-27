@@ -44,7 +44,7 @@
 
 #include "msd.h"
 
-#include <deque>
+#include <numeric>
 
 #include "gromacs/analysisdata/analysisdata.h"
 #include "gromacs/analysisdata/modules/average.h"
@@ -55,13 +55,21 @@
 #include "gromacs/options/filenameoption.h"
 #include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/selection/selectionoption.h"
+#include "gromacs/statistics/statistics.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectory/trajectoryframe.h"
+#include "gromacs/utility/futil.h"
 
 namespace gmx::analysismodules
 {
 
 namespace {
+
+// Convert nm^2/ps to 10e-5 cm^2/s
+constexpr double c_diffusionConversionFactor = 1000.0;
+// 6 For 3D, 4 for 2D, 2 for 1D diffusion
+// TODO genericize
+constexpr double c_diffusionDimensionFactor = 6.0;
 
 real MeanSquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
     real result = 0;
@@ -90,22 +98,27 @@ private:
     //! Selections for rdf output
     Selection sel_;
 
-    //! Output file
-    std::string out_file_;
-
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
     int trestart_ = 10;
     long t0_ = 0;
-    long dt_ = 0;
+    long dt_ = -1;
     int natoms_ = 0;
-
+    real beginFit_ = -1 ;
+    real endFit_ = -1 ;
     // Coordinates - first indexed by frame, then by atom
     std::vector<std::vector<RVec>> frames_;
     // Timestamp associated with coordinates
     std::vector<long> times_;
     // Results - first indexed by tau, then just data points
     std::vector<std::vector<real>> msds_;
+    // Summed and averaged MSDs - indexed by tau
+    std::vector<real> msd_sums_;
+    // Calculated Diffusion coefficients, per group, as well as error estimates.
+    std::vector<real> diffusionCoefficients_;
+    std::vector<real> sigmas_;
+    // Output stuff
+    std::string out_file_;
 };
 
 
@@ -129,10 +142,15 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
     // TODO  - allow multiple selections
     options->addOption(SelectionOption("sel").store(&sel_).required().onlyStatic().description(
             "Selections to compute MSDs for from the reference"));
+
+
 }
 
 void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
 {
+    // TODO - per group diffusion coefficients.
+    diffusionCoefficients_.resize(1);
+    sigmas_.resize(1);
 
 }
 
@@ -145,44 +163,90 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 
 void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* gmx_unused pdata)
 {
+
     long time = std::round(fr.time);
-    if (!bRmod(fr.time, t0_, trestart_)) {
+    if (!bRmod(time, t0_, trestart_)) {
+
         return;
     }
 
     // Need to populate dt on frame 2;
-    if (dt_ == 0 && !times_.empty()) {
+    if (dt_ < 0 && !times_.empty()) {
         dt_ = time - times_[0];
     }
 
     std::vector<RVec> coords(sel_.coordinates().begin(), sel_.coordinates().end());
+    times_.push_back(time);
+    frames_.push_back(std::move(coords));
 
     // For each preceding frame, calculate tau and do comparison.
     // NOTE - as currently construed, one element is added to msds_ for each frame
     msds_.emplace_back();
     for (size_t i = 0; i < frames_.size(); i++) {
-        long tau_index = (time - times_[i]) / dt_;
-        msds_[tau_index].push_back(MeanSquaredDisplacement(coords.data(), frames_[i].data(), natoms_));
+        long tau = time - times_[i];
+        long tau_index =  tau / dt_;
+        msds_[tau_index].push_back(MeanSquaredDisplacement(frames_.back().data(), frames_[i].data(), natoms_));
     }
-
-    times_.push_back(time);
-    frames_.push_back(std::move(coords));
 }
 
 void Msd::finishAnalysis(int gmx_unused nframes) {
+    const int numPoints = msds_.size();
+    msd_sums_.reserve(numPoints);
+    for (gmx::ArrayRef<const real> msd_vals : msds_) {
+        msd_sums_.push_back(
+                std::accumulate(msd_vals.begin(),
+                                msd_vals.end(),
+                                0.0,
+                        std::plus<>()
+                                ) / msd_vals.size());
+    }
+
+    // Set up vector of taus to compare against
+    // TODO just do this during analyze frame
+    std::vector<real> taus;
+    taus.resize(numPoints);
+    std::iota(taus.begin(), taus.end(), 0);
+    std::transform(taus.begin(), taus.end(), taus.begin(), [=](real d) -> real { return d * dt_; });
+
+    // These aren't used, except for corrCoef, which is used to estimate error if enough points are
+    // available.
+    real b = 0.0, corrCoef =0.0, chiSquared = 0.0;
+    if (numPoints >= 4)
+    {
+        // Split the fit in 2, and compare the results of each fit;
+        real a = 0.0, a2 = 0.0;
+        lsq_y_ax_b(numPoints / 2, taus.data(), msd_sums_.data(), &a, &b, &corrCoef, &chiSquared);
+        lsq_y_ax_b(numPoints / 2, taus.data() + numPoints / 2, msd_sums_.data() + numPoints/ 2, &a2, &b, &corrCoef, &chiSquared);
+        sigmas_[0] = std::abs(a - a2);
+    }
+    lsq_y_ax_b(numPoints, taus.data(), msd_sums_.data(), &diffusionCoefficients_[0], &b, &corrCoef, &chiSquared);
+    diffusionCoefficients_[0] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
+    sigmas_[0] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
 }
 
 void Msd::writeOutput() {
-    long tau = times_[0];
-    for (gmx::ArrayRef<const real> msd_vals : msds_) {
-        real sum = 0.0;
-        for (real val : msd_vals) {
-            sum += val;
-        }
-        sum /= msd_vals.size();
-        fprintf(stdout, "MSD at tau %li = %f", tau, sum);
+
+    // Ideally we'd use the trajectory analysis framework with a plot module for output.
+    // Unfortunately MSD is one of the few analyses where the number of datasets and data columns
+    // can't be determined until simulation end, so AnalysisData objects can't be easily used here.
+    FILE* out = gmx_ffopen(out_file_, "w");
+    fprintf(out, "# MSD gathered over PLACEHOLDER ps with %zul restarts\n", frames_.size());
+    // fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginfit, endfit,
+    if (diffusionCoefficients_[0]  > 0.01 && diffusionCoefficients_[0] < 1e4)
+    {
+        fprintf(out, "D[%10s] %.4f (+/- %.4f) 1e-5 cm^2/s\n", "placeholder", diffusionCoefficients_[0] , sigmas_[0]);
+    }
+    else
+    {
+        fprintf(out, "D[%10s] %.4g (+/- %.4f) 1e-5 cm^2/s\n", "placeholder", diffusionCoefficients_[0] , sigmas_[0]);
+    }
+
+    long tau = times_[0] - t0_;
+    for (const real msd : msd_sums_) {
+        fprintf(out, "%10g  %10g\n", static_cast<double>(tau), msd);
         tau += dt_;
     }
+    gmx_ffclose(out);
 }
 
 
