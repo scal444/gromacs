@@ -49,7 +49,10 @@
 #include "gromacs/analysisdata/analysisdata.h"
 #include "gromacs/analysisdata/modules/average.h"
 #include "gromacs/analysisdata/modules/plot.h"
+#include "gromacs/fileio/oenv.h"
 #include "gromacs/fileio/trxio.h"
+#include "gromacs/fileio/xvgr.h"
+#include "gromacs/math/functions.h"
 #include "gromacs/math/vectypes.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/filenameoption.h"
@@ -60,6 +63,7 @@
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/utility/futil.h"
+#include "gromacs/utility/programcontext.h"
 
 namespace gmx::analysismodules
 {
@@ -93,6 +97,10 @@ std::vector<real> MsdData::AverageMsds() const {
     std::vector<real> msdSums;
     msdSums.reserve(msds_.size());
     for (gmx::ArrayRef<const real> msd_vals : msds_) {
+        if (msd_vals.empty()) {
+            msdSums.push_back(0.0);
+            continue;
+        }
         msdSums.push_back(
                 std::accumulate(msd_vals.begin(),
                                 msd_vals.end(),
@@ -120,6 +128,7 @@ class Msd : public TrajectoryAnalysisModule
 {
 public:
     Msd();
+    ~Msd() override;
 
     void initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* settings) override;
     void initAfterFirstFrame(const TrajectoryAnalysisSettings& settings, const t_trxframe& fr) override;
@@ -134,17 +143,17 @@ private:
 
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
-    int trestart_ = 10;
-    long t0_ = 0;
-    long dt_ = -1;
-    // real beginFit_ = -1 ;
-    // real endFit_ = -1 ;
+    real trestart_ = 10.0;
+    real t0_ = 0;
+    real dt_ = -1;
+    real beginFit_ = -1.0 ;
+    real endFit_ = -1.0 ;
     // Coordinates - first indexed by group, then by frame, then by atom
     std::vector<std::vector<std::vector<RVec>>> frames_;
     // Previous coordinates (indexed by group) - used for PBC correction.
     std::vector<std::vector<RVec>> previousFrames_;
     // Timestamp associated with coordinates
-    std::vector<long> times_;
+    std::vector<real> times_;
     //! Result accumulator indexed by group
     std::vector<MsdData> msds_;
     //! Summed and averaged MSDs - indexed by group, then by tau.
@@ -158,10 +167,14 @@ private:
 
     //! Output stuff
     std::string out_file_;
+    gmx_output_env_t* oenv_ = nullptr;
 };
 
 
 Msd::Msd() = default;
+Msd::~Msd() {
+    output_env_done(oenv_);
+}
 
 
 void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* settings)
@@ -178,6 +191,11 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
                                .store(&out_file_)
                                .defaultBasename("msdout")
                                .description("MSD output"));
+    // TODO handle variable time
+    options->addOption(RealOption("trestart").
+                       description("Time between restarting points in trajectory (ps)").
+                       defaultValue(10.0).
+                       store(&trestart_));
     options->addOption(SelectionOption("sel").storeVector(&sel_).required().onlyStatic().multiValue().description(
             "Selections to compute MSDs for from the reference"));
 
@@ -195,6 +213,8 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     msd_sums_.resize(sel_.size());
     diffusionCoefficients_.resize(sel_.size());
     sigmas_.resize(sel_.size());
+
+    output_env_init(&oenv_, getProgramContext(), settings.timeUnit(), FALSE, settings.plotSettings().plotFormat(), 0);
 }
 
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
@@ -209,13 +229,6 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 
 void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* gmx_unused pdata)
 {
-
-    long time = std::round(fr.time);
-    if (!bRmod(time, t0_, trestart_))
-    {
-
-        return;
-    }
     // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
     // selections haven't been evaluated
     if (frnr == 0)
@@ -225,6 +238,8 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
             std::copy(sel_[g].coordinates().begin(), sel_[g].coordinates().end(), previousFrames_[g].begin());
         }
     }
+
+    const real time = std::round(fr.time);
     // Need to populate dt on frame 2;
     if (dt_ < 0 && !times_.empty()) {
         dt_ = time - times_[0];
@@ -260,46 +275,64 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         std::transform(coords.begin(), coords.end(), previousFrames_[g].begin(), coords.begin(), pbcRemover);
         // std::transform()
 
-        frames_[g].push_back(std::move(coords));
+
 
         // For each preceding frame, calculate tau and do comparison.
         // NOTE - as currently construed, one element is added to msds_ for each frame
         for (size_t i = 0; i < frames_[g].size(); i++)
         {
-            long tau       = time - times_[i];
-            long tau_index = tau / dt_;
+            real tau       = time - times_[i];
+            long tau_index = gmx::roundToInt64(tau / dt_);
             msds_[g].AddPoint(tau_index,  MeanSquaredDisplacement(
-                                                 frames_[g].back().data(),
+                                                 coords.data(),
                                                  frames_[g][i].data(),
                                                  sel_[g].posCount()));
         }
-
+        // We only store the frame for the future if it's a restart per -trestart.
+        if (bRmod(time, t0_, trestart_))
+        {
+            frames_[g].push_back(std::move(coords));
+        }
         // Update "previous frame" for next rounds pbc removal
         std::copy(frames_[g].back().begin(), frames_[g].back().end(), previousFrames_[g].begin());
     }
 }
 
 void Msd::finishAnalysis(int gmx_unused nframes) {
-    const int numTaus = taus_.size();
+
+    // If unspecified, calculate beginfit and endfit as 10% and 90% indices.
+    int beginFitIndex = 0;
+    int endFitIndex = 0;
+    // TODO - the else clause when beginfit and endfit are supported.
+    if (beginFit_ < 0) {
+        beginFitIndex = gmx::roundToInt(taus_.size() * 0.1);
+        beginFit_ = taus_[beginFitIndex];
+    }
+    if (endFit_ < 0) {
+        const size_t maybeMaxIndex = gmx::roundToInt(taus_.size() * 0.9);
+        endFitIndex = maybeMaxIndex >= taus_.size() ? taus_.size() - 1 : maybeMaxIndex;
+        endFit_ = taus_[endFitIndex];
+    }
+    const int numTaus = 1 + endFitIndex - beginFitIndex;
 
     for (size_t g = 0; g < sel_.size(); g++) {
         msd_sums_[g] = msds_[g].AverageMsds();
-
-
 
         // These aren't used, except for corrCoef, which is used to estimate error if enough points are
         // available.
         real b = 0.0, corrCoef =0.0, chiSquared = 0.0;
         if (numTaus >= 4)
         {
+            const int halfNumTaus = numTaus / 2;
+            const int secondaryStartIndex = beginFitIndex + halfNumTaus;
             // Split the fit in 2, and compare the results of each fit;
             real a = 0.0, a2 = 0.0;
-            lsq_y_ax_b(numTaus / 2, taus_.data(), msd_sums_[g].data(), &a, &b, &corrCoef, &chiSquared);
-            lsq_y_ax_b(numTaus / 2,
-                       taus_.data() + numTaus / 2, msd_sums_[g].data() + numTaus/ 2, &a2, &b, &corrCoef, &chiSquared);
+            lsq_y_ax_b(halfNumTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &a, &b, &corrCoef, &chiSquared);
+            lsq_y_ax_b(halfNumTaus,
+                       &taus_[secondaryStartIndex], &msd_sums_[g][secondaryStartIndex], &a2, &b, &corrCoef, &chiSquared);
             sigmas_[g] = std::abs(a - a2);
         }
-        lsq_y_ax_b(numTaus, taus_.data(), msd_sums_[g].data(), &diffusionCoefficients_[g], &b, &corrCoef, &chiSquared);
+        lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &diffusionCoefficients_[g], &b, &corrCoef, &chiSquared);
         diffusionCoefficients_[g] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
         sigmas_[g] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
     }
@@ -315,18 +348,24 @@ void Msd::writeOutput() {
     // Ideally we'd use the trajectory analysis framework with a plot module for output.
     // Unfortunately MSD is one of the few analyses where the number of datasets and data columns
     // can't be determined until simulation end, so AnalysisData objects can't be easily used here.
-    FILE* out = gmx_ffopen(out_file_, "w");
-    fprintf(out, "# MSD gathered over PLACEHOLDER ps with %zul restarts\n", frames_.size());
+    // Since the plotting modules are completely wired into the analysis data, we can't use the nice
+    // plotting functionality.
+    // FILE* out = gmx_ffopen(out_file_, "w");
+    FILE* out = xvgropen(out_file_.c_str(), "Mean Square Displacement",  output_env_get_xvgr_tlabel(oenv_),
+                         "MSD (nm\\S2\\N)", oenv_);
+    fprintf(out, "# MSD gathered over %g %s with %zu restarts\n", times_.back() - times_[0], output_env_get_time_unit(oenv_).c_str(), frames_[0].size());
+    fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginFit_, endFit_,
+            output_env_get_time_unit(oenv_).c_str());
     for (size_t g = 0; g < sel_.size(); g++) {
         // fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginfit, endfit,
         if (diffusionCoefficients_[g]  > 0.01 && diffusionCoefficients_[g] < 1e4)
         {
-            fprintf(out, "# D[%10s] %.4f (+/- %.4f) 1e-5 cm^2/s\n",
+            fprintf(out, "# D[%10s] = %.4f (+/- %.4f) (1e-5 cm^2/s)\n",
                     sel_[g].name(), diffusionCoefficients_[g] , sigmas_[g]);
         }
         else
         {
-            fprintf(out, "# D[%10s] %.4g (+/- %.4f) 1e-5 cm^2/s\n",
+            fprintf(out, "# D[%10s] = %.4g (+/- %.4f) (1e-5 cm^2/s)\n",
                     sel_[g].name(), diffusionCoefficients_[g] , sigmas_[g]);
         }
     }
@@ -338,7 +377,7 @@ void Msd::writeOutput() {
         }
         fprintf(out, "\n");
     }
-    gmx_ffclose(out);
+    xvgrclose(out);
 }
 
 

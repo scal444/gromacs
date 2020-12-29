@@ -45,6 +45,7 @@ gmx_add_gtest_executable(trajectoryanalysis-test
         distance.cpp
         extract_cluster.cpp
         freevolume.cpp
+        msd.cpp
         pairdist.cpp
         rdf.cpp
         sasa.cpp
