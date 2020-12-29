@@ -54,6 +54,7 @@
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/filenameoption.h"
 #include "gromacs/options/ioptionscontainer.h"
+#include "gromacs/pbcutil/pbc.h"
 #include "gromacs/selection/selectionoption.h"
 #include "gromacs/statistics/statistics.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
@@ -140,6 +141,8 @@ private:
     // real endFit_ = -1 ;
     // Coordinates - first indexed by group, then by frame, then by atom
     std::vector<std::vector<std::vector<RVec>>> frames_;
+    // Previous coordinates (indexed by group) - used for PBC correction.
+    std::vector<std::vector<RVec>> previousFrames_;
     // Timestamp associated with coordinates
     std::vector<long> times_;
     //! Result accumulator indexed by group
@@ -186,6 +189,7 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     // Accumulated frames and results
     msds_.resize(sel_.size());
     frames_.resize(sel_.size());
+    previousFrames_.resize(sel_.size());
 
     // Processed result structures
     msd_sums_.resize(sel_.size());
@@ -196,6 +200,10 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
 {
     t0_ = std::round(fr.time);
+    for (size_t g = 0; g < sel_.size(); g++) {
+        previousFrames_[g].resize(sel_[g].posCount());
+        std::copy(sel_[g].coordinates().begin(), sel_[g].coordinates().end(), previousFrames_[g].begin());
+    }
 }
 
 
@@ -203,11 +211,20 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
 {
 
     long time = std::round(fr.time);
-    if (!bRmod(time, t0_, trestart_)) {
+    if (!bRmod(time, t0_, trestart_))
+    {
 
         return;
     }
-
+    // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
+    // selections haven't been evaluated
+    if (frnr == 0)
+    {
+        for (size_t g = 0; g < sel_.size(); g++)
+        {
+            std::copy(sel_[g].coordinates().begin(), sel_[g].coordinates().end(), previousFrames_[g].begin());
+        }
+    }
     // Need to populate dt on frame 2;
     if (dt_ < 0 && !times_.empty()) {
         dt_ = time - times_[0];
@@ -221,6 +238,28 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
     for (size_t g = 0; g < sel_.size(); g++)
     {
         std::vector<RVec> coords(sel_[g].coordinates().begin(), sel_[g].coordinates().end());
+        // TODO msd mol
+
+        // Do PBC removal
+        auto pbcRemover = [pbc] (RVec in, RVec prev)
+        {
+            for (int dimension = 0; dimension < DIM; dimension++) {
+                // If we've moved in a negative direction more than half the box distance.
+                while (in[dimension] - prev[dimension] < -pbc->hbox_diag[dimension])
+                {
+                    in[dimension] = in[dimension] + pbc->fbox_diag[dimension];
+                }
+                // If we've moved in a positive direction more than half the box distance.
+                while (in[dimension] - prev[dimension] > pbc->hbox_diag[dimension])
+                {
+                    in[dimension] = in[dimension] - pbc->fbox_diag[dimension];
+                }
+            }
+            return in;
+        };
+        std::transform(coords.begin(), coords.end(), previousFrames_[g].begin(), coords.begin(), pbcRemover);
+        // std::transform()
+
         frames_[g].push_back(std::move(coords));
 
         // For each preceding frame, calculate tau and do comparison.
@@ -234,6 +273,9 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
                                                  frames_[g][i].data(),
                                                  sel_[g].posCount()));
         }
+
+        // Update "previous frame" for next rounds pbc removal
+        std::copy(frames_[g].back().begin(), frames_[g].back().end(), previousFrames_[g].begin());
     }
 }
 
