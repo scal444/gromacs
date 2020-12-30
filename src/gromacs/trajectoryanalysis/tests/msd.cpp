@@ -45,12 +45,19 @@
 
 #include <gtest/gtest.h>
 
+#include "gromacs/utility/stringutil.h"
+#include "gromacs/utility/textstream.h"
+
 #include "testutils/cmdlinetest.h"
+#include "testutils/refdata.h"
 #include "testutils/testasserts.h"
 #include "testutils/textblockmatchers.h"
 #include "testutils/xvgtest.h"
 
 #include "moduletest.h"
+
+namespace gmx::test
+{
 
 namespace
 {
@@ -63,20 +70,102 @@ using gmx::test::XvgMatch;
  */
 
 //! Test fixture for the select analysis module.
-typedef gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::analysismodules::MsdInfo> MsdModuleTest;
 
-// for 3D, (8 + 4 + 0) / 3 should yield 4 cm^2 / s
+class MsdModuleTest : public gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::analysismodules::MsdInfo>
+{
+public:
+    MsdModuleTest()
+    {
+        setInputFile("-f", "msd_traj.xtc");
+        setInputFile("-s", "msd_coords.gro");
+        setInputFile("-n", "msd.ndx");
+    }
+};
+
+// ----------------------------------------------
+// These tests match against the MSD vs tau plot.
+// ----------------------------------------------
 TEST_F(MsdModuleTest, threeDimensionalDiffusion)
 {
     setOutputFile("-o", "msd.xvg", XvgMatch());
-    setInputFile("-f", "msd_traj.xtc");
-    setInputFile("-s", "msd_coords.gro");
-    setInputFile("-n", "msd.ndx");
+
     const char* const cmdline[] = {
-            "msd", "-trestart", "200", "-sel", "0",
+        "msd", "-trestart", "200", "-sel", "0",
     };
     runTest(CommandLine(cmdline));
 }
 
+TEST_F(MsdModuleTest, twoDimensionalDiffusion)
+{
+    setOutputFile("-o", "msd.xvg", XvgMatch());
+    const char* const cmdline[] = { "msd", "-trestart", "200", "-lateral", "z", "-sel", "0" };
+    runTest(CommandLine(cmdline));
+}
 
-}   // namespace
+TEST_F(MsdModuleTest, oneDimensionalDiffusion)
+{
+    setOutputFile("-o", "msd.xvg", XvgMatch());
+    const char* const cmdline[] = { "msd", "-trestart", "200", "-type", "x", "-sel", "0" };
+    runTest(CommandLine(cmdline));
+}
+
+// -------------------------------------------------------------------------
+// These tests use a custom matcher to check reported diffusion coefficients
+// ------------------------------------------------------------------------
+
+class MsdMatcher  : public ITextBlockMatcher
+{
+public:
+    MsdMatcher() = default;
+
+    void checkStream(TextInputStream* stream, TestReferenceChecker* checker) override {
+        TestReferenceChecker dCoefficientChecker(checker->checkCompound("XvgLegend", "DiffusionCoefficient"));
+        int rowCount = 0;
+        std::string line;
+        while (stream->readLine(&line)) {
+            if (!startsWith(line, "# D[")) {
+                continue;
+            }
+            dCoefficientChecker.checkString(stripString(line.substr(1)), nullptr);
+        }
+    }
+};
+
+class MsdMatch : public ITextBlockMatcherSettings
+{
+public:
+    TextBlockMatcherPointer createMatcher() const override{
+        return std::make_unique<MsdMatcher>();
+    }
+};
+
+// for 3D, (8 + 4 + 0) / 3 should yield 4 cm^2 / s
+TEST_F(MsdModuleTest, threeDimensionalDiffusionCoefficient)
+{
+    setOutputFile("-o", "msd.xvg", MsdMatch());
+
+    const char* const cmdline[] = {
+        "msd", "-trestart", "200", "-sel", "0",
+    };
+    runTest(CommandLine(cmdline));
+}
+
+// for lateral z, (8 + 4) / 2 should yield 6 cm^2 /s
+TEST_F(MsdModuleTest, twoDimensionalDiffusionCoefficient)
+{
+    setOutputFile("-o", "msd.xvg", MsdMatch());
+    const char* const cmdline[] = { "msd", "-trestart", "200", "-lateral", "z", "-sel", "0" };
+    runTest(CommandLine(cmdline));
+}
+
+// for type x, should yield 8 cm^2 / s
+TEST_F(MsdModuleTest, oneDimensionalDiffusionCoefficient)
+{
+    setOutputFile("-o", "msd.xvg", MsdMatch());
+    const char* const cmdline[] = { "msd", "-trestart", "200", "-type", "x", "-sel", "0" };
+    runTest(CommandLine(cmdline));
+}
+
+} // namespace
+
+}  // namespace gmx::test

@@ -62,8 +62,8 @@
 #include "gromacs/statistics/statistics.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectory/trajectoryframe.h"
-#include "gromacs/utility/futil.h"
 #include "gromacs/utility/programcontext.h"
+#include "gromacs/utility.h"
 
 namespace gmx::analysismodules
 {
@@ -72,9 +72,11 @@ namespace {
 
 // Convert nm^2/ps to 10e-5 cm^2/s
 constexpr double c_diffusionConversionFactor = 1000.0;
-// 6 For 3D, 4 for 2D, 2 for 1D diffusion
-// TODO genericize
-constexpr double c_diffusionDimensionFactor = 6.0;
+// Used in diffusion coefficient calculations
+constexpr double c_3DdiffusionDimensionFactor = 6.0;
+constexpr double c_2DdiffusionDimensionFactor = 4.0;
+constexpr double c_1DdiffusionDimensionFactor = 2.0;
+
 
 class MsdData {
 public:
@@ -111,18 +113,42 @@ std::vector<real> MsdData::AverageMsds() const {
     return msdSums;
 }
 
-
-
-real MeanSquaredDisplacement(const RVec* c1, const RVec* c2, int num_vals) {
+template<bool x, bool y, bool z>
+real MsdImpl(const RVec* c1, const RVec* c2, const int num_vals) {
     real result = 0;
     for (int i = 0; i < num_vals; i++) {
-        RVec displacement = c1[i] - c2[i];
-        result += displacement.dot(displacement);
+        if constexpr (x) {
+            result += (c1[i][XX] - c2[i][XX]) * (c1[i][XX] - c2[i][XX]);
+        }
+        if constexpr (y) {
+            result += (c1[i][YY] - c2[i][YY]) * (c1[i][YY] - c2[i][YY]);
+        }
+        if constexpr (z) {
+            result += (c1[i][ZZ] - c2[i][ZZ]) * (c1[i][ZZ] - c2[i][ZZ]);
+        }
     }
     return result / num_vals;
 }
 
 }  // namespace
+
+// Describes 1D MSDs, in the given dimension.
+enum class SingleDimDiffType : int {
+    unused = 0,
+    x,
+    y,
+    z,
+    Count,
+};
+
+// Describes 2D MSDs, in the plane normal to the given dimension.
+enum class TwoDimDiffType : int {
+    unused = 0,
+    xNormal,
+    yNormal,
+    zNormal,
+    Count,
+};
 
 class Msd : public TrajectoryAnalysisModule
 {
@@ -140,6 +166,12 @@ private:
 
     //! Selections for MSD output
     SelectionList sel_;
+
+    // MSD type information
+    SingleDimDiffType singleDimType_ = SingleDimDiffType::unused;
+    TwoDimDiffType twoDimType_ = TwoDimDiffType::unused;
+    double            diffusionCoefficientDimensionFactor_     = c_3DdiffusionDimensionFactor;
+    std::function<real(const RVec*, const RVec*, int)> calcFn_ = MsdImpl<true, true, true>;
 
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
@@ -177,6 +209,7 @@ Msd::~Msd() {
 }
 
 
+
 void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* settings)
 {
     static const char* const desc[] = {
@@ -191,15 +224,17 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
                                .store(&out_file_)
                                .defaultBasename("msdout")
                                .description("MSD output"));
-    // TODO handle variable time
     options->addOption(RealOption("trestart").
                        description("Time between restarting points in trajectory (ps)").
                        defaultValue(10.0).
                        store(&trestart_));
+
+    EnumerationArray<SingleDimDiffType, const char*> enumTypeNames = {"unselected", "x", "y", "z"};
+    EnumerationArray<TwoDimDiffType, const char*> enumLateralNames = {"unselected", "x", "y", "z"};
+    options->addOption(EnumOption<SingleDimDiffType>("type").enumValue(enumTypeNames).store(&singleDimType_).defaultValue(SingleDimDiffType::unused));
+    options->addOption(EnumOption<TwoDimDiffType>("lateral").enumValue(enumLateralNames).store(&twoDimType_).defaultValue(TwoDimDiffType::unused));
     options->addOption(SelectionOption("sel").storeVector(&sel_).required().onlyStatic().multiValue().description(
             "Selections to compute MSDs for from the reference"));
-
-
 }
 
 void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
@@ -215,6 +250,46 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     sigmas_.resize(sel_.size());
 
     output_env_init(&oenv_, getProgramContext(), settings.timeUnit(), FALSE, settings.plotSettings().plotFormat(), 0);
+
+    // Parse dimensionality and assign the MSD calculating function.
+    if (singleDimType_ != SingleDimDiffType::unused && twoDimType_ != TwoDimDiffType::unused) {
+        std::string errorMessage =
+                "Options -type and -lateral are mutually exclusive. Choose one or neither.";
+        GMX_THROW(InconsistentInputError(errorMessage.c_str()));
+    }
+
+    switch (singleDimType_) {
+        case SingleDimDiffType::x:
+            calcFn_ = MsdImpl<true, false, false>;
+            diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
+            break;
+        case SingleDimDiffType::y:
+            calcFn_ = MsdImpl<false, true, false>;
+            diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
+            break;
+        case SingleDimDiffType::z:
+            calcFn_ = MsdImpl<false, false, true>;
+            diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
+            break;
+        default:
+            break;
+    }
+    switch (twoDimType_) {
+        case TwoDimDiffType::xNormal:
+            calcFn_ = MsdImpl<false, true, true>;
+            diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
+            break;
+        case TwoDimDiffType::yNormal:
+            calcFn_ = MsdImpl<true, false, true>;
+            diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
+            break;
+        case TwoDimDiffType::zNormal:
+            calcFn_ = MsdImpl<true, true, false>;
+            diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
+            break;
+        default:
+            break;
+    }
 }
 
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
@@ -283,7 +358,7 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         {
             real tau       = time - times_[i];
             long tau_index = gmx::roundToInt64(tau / dt_);
-            msds_[g].AddPoint(tau_index,  MeanSquaredDisplacement(
+            msds_[g].AddPoint(tau_index,  calcFn_(
                                                  coords.data(),
                                                  frames_[g][i].data(),
                                                  sel_[g].posCount()));
@@ -333,8 +408,8 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
             sigmas_[g] = std::abs(a - a2);
         }
         lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &diffusionCoefficients_[g], &b, &corrCoef, &chiSquared);
-        diffusionCoefficients_[g] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
-        sigmas_[g] *= c_diffusionConversionFactor / c_diffusionDimensionFactor;
+        diffusionCoefficients_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
+        sigmas_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
     }
 
 
@@ -350,14 +425,13 @@ void Msd::writeOutput() {
     // can't be determined until simulation end, so AnalysisData objects can't be easily used here.
     // Since the plotting modules are completely wired into the analysis data, we can't use the nice
     // plotting functionality.
-    // FILE* out = gmx_ffopen(out_file_, "w");
     FILE* out = xvgropen(out_file_.c_str(), "Mean Square Displacement",  output_env_get_xvgr_tlabel(oenv_),
                          "MSD (nm\\S2\\N)", oenv_);
-    fprintf(out, "# MSD gathered over %g %s with %zu restarts\n", times_.back() - times_[0], output_env_get_time_unit(oenv_).c_str(), frames_[0].size());
+    fprintf(out, "# MSD gathered over %g %s with %zu restarts\n", times_.back() - times_[0],
+            output_env_get_time_unit(oenv_).c_str(), frames_[0].size());
     fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginFit_, endFit_,
             output_env_get_time_unit(oenv_).c_str());
     for (size_t g = 0; g < sel_.size(); g++) {
-        // fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginfit, endfit,
         if (diffusionCoefficients_[g]  > 0.01 && diffusionCoefficients_[g] < 1e4)
         {
             fprintf(out, "# D[%10s] = %.4f (+/- %.4f) (1e-5 cm^2/s)\n",
