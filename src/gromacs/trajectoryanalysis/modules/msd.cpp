@@ -61,6 +61,7 @@
 #include "gromacs/selection/selectionoption.h"
 #include "gromacs/statistics/statistics.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
+#include "gromacs/trajectoryanalysis/topologyinformation.h"
 #include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/utility/programcontext.h"
 #include "gromacs/utility.h"
@@ -114,18 +115,25 @@ std::vector<real> MsdData::AverageMsds() const {
 }
 
 template<bool x, bool y, bool z>
-real MsdImpl(const RVec* c1, const RVec* c2, const int num_vals) {
+inline real CalcSingleMsd(RVec c1, RVec c2) {
+    real result = 0;
+    if constexpr (x) {
+        result += (c1[XX] - c2[XX]) * (c1[XX] - c2[XX]);
+    }
+    if constexpr (y) {
+        result += (c1[YY] - c2[YY]) * (c1[YY] - c2[YY]);
+    }
+    if constexpr (z) {
+        result += (c1[ZZ] - c2[ZZ]) * (c1[ZZ] - c2[ZZ]);
+    }
+    return result;
+}
+
+template<bool x, bool y, bool z>
+real CalcMsds(const RVec* c1, const RVec* c2, const int num_vals) {
     real result = 0;
     for (int i = 0; i < num_vals; i++) {
-        if constexpr (x) {
-            result += (c1[i][XX] - c2[i][XX]) * (c1[i][XX] - c2[i][XX]);
-        }
-        if constexpr (y) {
-            result += (c1[i][YY] - c2[i][YY]) * (c1[i][YY] - c2[i][YY]);
-        }
-        if constexpr (z) {
-            result += (c1[i][ZZ] - c2[i][ZZ]) * (c1[i][ZZ] - c2[i][ZZ]);
-        }
+        result += CalcSingleMsd<x,y,z>(c1[i], c2[i]);
     }
     return result / num_vals;
 }
@@ -171,7 +179,7 @@ private:
     SingleDimDiffType singleDimType_ = SingleDimDiffType::unused;
     TwoDimDiffType twoDimType_ = TwoDimDiffType::unused;
     double            diffusionCoefficientDimensionFactor_     = c_3DdiffusionDimensionFactor;
-    std::function<real(const RVec*, const RVec*, int)> calcFn_ = MsdImpl<true, true, true>;
+    std::function<real(const RVec*, const RVec*, int)> calcFn_ = CalcMsds<true, true, true>;
 
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
@@ -182,6 +190,8 @@ private:
     real endFit_ = -1.0 ;
     // Coordinates - first indexed by group, then by frame, then by atom
     std::vector<std::vector<std::vector<RVec>>> frames_;
+    std::vector<std::vector<real>> frame_times_;
+
     // Previous coordinates (indexed by group) - used for PBC correction.
     std::vector<std::vector<RVec>> previousFrames_;
     // Timestamp associated with coordinates
@@ -197,8 +207,19 @@ private:
     //! Taus for output - won't know the size until the end.
     std::vector<real> taus_;
 
+    // MSD per-molecule stuff
+    bool mol_selected_ = false;
+    // per group per mol atom count for COM calculation.
+    std::vector<std::vector<int>> mol_atom_counts_;
+    // Per group mol index vector
+    std::vector<std::vector<int>> mol_index_mappings_;
+    // Stores the msd data of each molecule for group 1, indexed by molecule
+    std::vector<MsdData> per_mol_msds_;
+    std::vector<real> perMolDiffusionCoefficients_;
+
     //! Output stuff
     std::string out_file_;
+    std::string mol_file_;
     gmx_output_env_t* oenv_ = nullptr;
 };
 
@@ -228,6 +249,9 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
                        description("Time between restarting points in trajectory (ps)").
                        defaultValue(10.0).
                        store(&trestart_));
+    options->addOption(FileNameOption("mol").filetype(eftPlot).outputFile()
+                               .store(&mol_file_).storeIsSet(&mol_selected_).defaultBasename("diff_mol")
+                               .description("Report diffusion coefficients for each molecule in selection"));
 
     EnumerationArray<SingleDimDiffType, const char*> enumTypeNames = {"unselected", "x", "y", "z"};
     EnumerationArray<TwoDimDiffType, const char*> enumLateralNames = {"unselected", "x", "y", "z"};
@@ -237,17 +261,19 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
             "Selections to compute MSDs for from the reference"));
 }
 
-void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& /* top */)
+void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& top)
 {
+    const int numSelections = sel_.size();
     // Accumulated frames and results
-    msds_.resize(sel_.size());
-    frames_.resize(sel_.size());
-    previousFrames_.resize(sel_.size());
+    msds_.resize(numSelections);
+    frames_.resize(numSelections);
+    frame_times_.resize(numSelections);
+    previousFrames_.resize(numSelections);
 
     // Processed result structures
-    msd_sums_.resize(sel_.size());
-    diffusionCoefficients_.resize(sel_.size());
-    sigmas_.resize(sel_.size());
+    msd_sums_.resize(numSelections);
+    diffusionCoefficients_.resize(numSelections);
+    sigmas_.resize(numSelections);
 
     output_env_init(&oenv_, getProgramContext(), settings.timeUnit(), FALSE, settings.plotSettings().plotFormat(), 0);
 
@@ -260,15 +286,15 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
 
     switch (singleDimType_) {
         case SingleDimDiffType::x:
-            calcFn_ = MsdImpl<true, false, false>;
+            calcFn_ = CalcMsds<true, false, false>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         case SingleDimDiffType::y:
-            calcFn_ = MsdImpl<false, true, false>;
+            calcFn_ = CalcMsds<false, true, false>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         case SingleDimDiffType::z:
-            calcFn_ = MsdImpl<false, false, true>;
+            calcFn_ = CalcMsds<false, false, true>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         default:
@@ -276,19 +302,41 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     }
     switch (twoDimType_) {
         case TwoDimDiffType::xNormal:
-            calcFn_ = MsdImpl<false, true, true>;
+            calcFn_ = CalcMsds<false, true, true>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         case TwoDimDiffType::yNormal:
-            calcFn_ = MsdImpl<true, false, true>;
+            calcFn_ = CalcMsds<true, false, true>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         case TwoDimDiffType::zNormal:
-            calcFn_ = MsdImpl<true, true, false>;
+            calcFn_ = CalcMsds<true, true, false>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         default:
             break;
+    }
+
+    // TODO validate that we have mol info and not atom only.
+    if (mol_selected_) {
+        mol_index_mappings_.resize(numSelections);
+        mol_atom_counts_.resize(numSelections);
+        for (int g = 0; g < numSelections; g++) {
+            int nMol = sel_[g].initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
+            if (g == 0)
+            {
+                per_mol_msds_.resize(nMol);
+                perMolDiffusionCoefficients_.resize(nMol);
+            }
+            gmx::ArrayRef<const int> mapped_ids = sel_[0].mappedIds();
+            mol_index_mappings_[g].resize(sel_[g].posCount());
+            std::copy(mapped_ids.begin(), mapped_ids.end(), mol_index_mappings_[g].begin());
+
+            mol_atom_counts_[g].resize(nMol, 0);
+            for (int i = 0; i < sel_[g].posCount(); i++) {
+                mol_atom_counts_[g][mapped_ids[i]]++;
+            }
+        }
     }
 }
 
@@ -296,24 +344,17 @@ void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused setti
 {
     t0_ = std::round(fr.time);
     for (size_t g = 0; g < sel_.size(); g++) {
-        previousFrames_[g].resize(sel_[g].posCount());
-        std::copy(sel_[g].coordinates().begin(), sel_[g].coordinates().end(), previousFrames_[g].begin());
+        if (mol_selected_) {
+            previousFrames_[g].resize(mol_atom_counts_[g].size());
+        } else {
+            previousFrames_[g].resize(sel_[g].posCount());
+        }
     }
 }
 
 
 void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unused pbc, TrajectoryAnalysisModuleData* gmx_unused pdata)
 {
-    // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
-    // selections haven't been evaluated
-    if (frnr == 0)
-    {
-        for (size_t g = 0; g < sel_.size(); g++)
-        {
-            std::copy(sel_[g].coordinates().begin(), sel_[g].coordinates().end(), previousFrames_[g].begin());
-        }
-    }
-
     const real time = std::round(fr.time);
     // Need to populate dt on frame 2;
     if (dt_ < 0 && !times_.empty()) {
@@ -328,48 +369,90 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
     for (size_t g = 0; g < sel_.size(); g++)
     {
         std::vector<RVec> coords(sel_[g].coordinates().begin(), sel_[g].coordinates().end());
-        // TODO msd mol
-
         // Do PBC removal
+
+
+        if (mol_selected_) {
+            // Do COM gathering for group 0 to get mol stuff. Note that pbc/com removal is already done
+            // operate on vector[RVec] where each RVec is a mol COM
+            // go to vector[molInd (0 based)]vector[tau]vector[entry] for summation.
+
+            // First create a clear buffer
+            std::vector<RVec> mol_positions(mol_atom_counts_[g].size(), {0.0, 0.0, 0.0});
+
+            // Sum up all positions
+            // TODO mass weight.
+            for(int i = 0; i < sel_[g].posCount(); i++) {
+                const int mol_index = mol_index_mappings_[g][i];
+                mol_positions[mol_index] += coords[i] / mol_atom_counts_[g][mol_index];
+            }
+
+            // Override the current coordinates.
+            coords = std::move(mol_positions);
+        }
+
+        // There are two types of "pbc removal" in gmx msd. The first happens in the trajectoryanalysis
+        // framework, which makes molecules whole across periodic boundaries and is done
+        // automatically where the inputs support it. This lambda performs the second PBC correction, where
+        // any "jump" across periodic boundaries BETWEEN FRAMES is put back. The order of these
+        // operations is important - since the first transformation may only apply to part of a
+        // molecule (e.g., one half in/out of the box is put on one side of the box), the
+        // subsequent step needs to be applied to the molecule COM rather than individual atoms, or
+        // we'd have a clash where the per-mol PBC removal moves an atom that gets put back into
+        // it's original position by the second transformation. Therefore, this second transformation
+        // is applied *after* per molecule coordinates have been consolidated into COMs.
         auto pbcRemover = [pbc] (RVec in, RVec prev)
         {
-            for (int dimension = 0; dimension < DIM; dimension++) {
-                // If we've moved in a negative direction more than half the box distance.
-                while (in[dimension] - prev[dimension] < -pbc->hbox_diag[dimension])
-                {
-                    in[dimension] = in[dimension] + pbc->fbox_diag[dimension];
-                }
-                // If we've moved in a positive direction more than half the box distance.
-                while (in[dimension] - prev[dimension] > pbc->hbox_diag[dimension])
-                {
-                    in[dimension] = in[dimension] - pbc->fbox_diag[dimension];
-                }
-            }
-            return in;
+          for (int dimension = 0; dimension < DIM; dimension++) {
+              // If we've moved in a negative direction more than half the box distance.
+              while (in[dimension] - prev[dimension] < -pbc->hbox_diag[dimension])
+              {
+                  in[dimension] = in[dimension] + pbc->fbox_diag[dimension];
+              }
+              // If we've moved in a positive direction more than half the box distance.
+              while (in[dimension] - prev[dimension] > pbc->hbox_diag[dimension])
+              {
+                  in[dimension] = in[dimension] - pbc->fbox_diag[dimension];
+              }
+          }
+          return in;
         };
-        std::transform(coords.begin(), coords.end(), previousFrames_[g].begin(), coords.begin(), pbcRemover);
-        // std::transform()
+        // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
+        // selections haven't been evaluated. No cross-box pbc removal for the first frame - note
+        // that while initAfterFirstFrame does not do per-mol PBC removal, it is done prior to
+        // AnalyzeFrame for frame 0, so when we store frame 0 there's no wonkiness.
+        if (frnr != 0) {
 
-
+            std::transform(coords.begin(), coords.end(), previousFrames_[g].begin(), coords.begin(), pbcRemover);
+        }
+        // Update "previous frame" for next rounds pbc removal. Note that for msd mol these coords
+        // are actually the molecule COM.
+        std::copy(coords.begin(), coords.end(), previousFrames_[g].begin());
 
         // For each preceding frame, calculate tau and do comparison.
         // NOTE - as currently construed, one element is added to msds_ for each frame
         for (size_t i = 0; i < frames_[g].size(); i++)
         {
-            real tau       = time - times_[i];
+            real tau       = time - frame_times_[g][i];
             long tau_index = gmx::roundToInt64(tau / dt_);
             msds_[g].AddPoint(tau_index,  calcFn_(
                                                  coords.data(),
                                                  frames_[g][i].data(),
-                                                 sel_[g].posCount()));
+                                                 mol_selected_ ? per_mol_msds_.size() : sel_[g].posCount()));
+            if (g == 0 && mol_selected_) {
+                for (size_t molInd = 0; molInd < per_mol_msds_.size(); molInd++) {
+                    per_mol_msds_[molInd].AddPoint(tau_index, calcFn_(&coords[molInd], &frames_[g][i][molInd], 1));
+                }
+            }
         }
+
+
         // We only store the frame for the future if it's a restart per -trestart.
         if (bRmod(time, t0_, trestart_))
         {
             frames_[g].push_back(std::move(coords));
+            frame_times_[g].push_back(time);
         }
-        // Update "previous frame" for next rounds pbc removal
-        std::copy(frames_[g].back().begin(), frames_[g].back().end(), previousFrames_[g].begin());
     }
 }
 
@@ -390,12 +473,14 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
     }
     const int numTaus = 1 + endFitIndex - beginFitIndex;
 
+    // These aren't used, except for corrCoef, which is used to estimate error if enough points are
+    // available.
+    real b = 0.0, corrCoef =0.0, chiSquared = 0.0;
+
     for (size_t g = 0; g < sel_.size(); g++) {
         msd_sums_[g] = msds_[g].AverageMsds();
 
-        // These aren't used, except for corrCoef, which is used to estimate error if enough points are
-        // available.
-        real b = 0.0, corrCoef =0.0, chiSquared = 0.0;
+
         if (numTaus >= 4)
         {
             const int halfNumTaus = numTaus / 2;
@@ -410,6 +495,16 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
         lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &diffusionCoefficients_[g], &b, &corrCoef, &chiSquared);
         diffusionCoefficients_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
         sigmas_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
+    }
+
+    if (!mol_selected_) {
+        return;
+    }
+
+    for (size_t i = 0; i < per_mol_msds_.size(); i++) {
+        std::vector<real> msds = per_mol_msds_[i].AverageMsds();
+        lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msds[beginFitIndex], &perMolDiffusionCoefficients_[i], &b, &corrCoef, & chiSquared);
+        perMolDiffusionCoefficients_[i] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
     }
 
 
@@ -452,6 +547,15 @@ void Msd::writeOutput() {
         fprintf(out, "\n");
     }
     xvgrclose(out);
+
+    // Handle per mol stuff if needed.
+    if (mol_selected_) {
+        out = xvgropen(mol_file_.c_str(), "Diffusion Coefficients / Molecule", "Molecule", "D (1e-5 cm^2/s)", oenv_);
+        for (size_t i = 0; i < perMolDiffusionCoefficients_.size(); i++) {
+            fprintf(out, "%10zu  %10g\n", i, perMolDiffusionCoefficients_[i]);
+        }
+        xvgrclose(out);
+    }
 }
 
 

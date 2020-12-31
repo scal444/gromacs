@@ -71,12 +71,18 @@ struct gmx_rmpbc
     rmpbc_graph_t*                graph;
 };
 
+bool hasInteractionDefinitions(const gmx_rmpbc_t gpbc) {
+    return (gpbc->idef != nullptr && gpbc->idef->ntypes <= 0) ||
+           (gpbc->interactionDefinitions != nullptr && !gpbc->interactionDefinitions->functype.empty());
+
+}
+
 static t_graph* gmx_rmpbc_get_graph(gmx_rmpbc_t gpbc, PbcType pbcType, int natoms)
 {
     int            i;
     rmpbc_graph_t* gr;
 
-    if (pbcType == PbcType::No || nullptr == gpbc || nullptr == gpbc->idef || gpbc->idef->ntypes <= 0)
+    if (pbcType == PbcType::No || nullptr == gpbc || !hasInteractionDefinitions(gpbc))
     {
         return nullptr;
     }
