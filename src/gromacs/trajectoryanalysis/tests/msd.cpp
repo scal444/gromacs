@@ -66,56 +66,24 @@ namespace
 {
 
 using gmx::test::CommandLine;
-using gmx::test::XvgMatch;
 
-/********************************************************************
- * Tests for gmx::analysismodules::PairDistance.
- */
-
-//! Test fixture for the select analysis module.
-
-class MsdModuleTest : public gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::analysismodules::MsdInfo>
+// \todo This is mostly taken from xvgtest.cpp. We could probably create some modular checker
+// functionality where each line is compared against a set of subcheckers automatically. Then we
+// could build matchers like this out of the modular components.
+bool isRelevantXvgCommand(const std::string& line)
 {
-public:
-    MsdModuleTest()
-    {
-        setInputFile("-f", "msd_traj.xtc");
-        setInputFile("-s", "msd_coords.gro");
-        setInputFile("-n", "msd.ndx");
-    }
-};
-
-// ----------------------------------------------
-// These tests match against the MSD vs tau plot.
-// ----------------------------------------------
-TEST_F(MsdModuleTest, threeDimensionalDiffusion)
-{
-    setOutputFile("-o", "msd.xvg", XvgMatch());
-
-    const char* const cmdline[] = {
-        "msd", "-trestart", "200", "-sel", "0",
-    };
-    runTest(CommandLine(cmdline));
+    return startsWith(line, "@") && (contains(line, " title ") || contains(line, " subtitle ") || contains(line, " label ")
+                                     || contains(line, "@TYPE ") || contains(line, " legend \""));
 }
 
-TEST_F(MsdModuleTest, twoDimensionalDiffusion)
+//! Helper function to check a single xvg value in a sequence.
+void checkXvgDataPoint(TestReferenceChecker* checker, const std::string& value)
 {
-    setOutputFile("-o", "msd.xvg", XvgMatch());
-    const char* const cmdline[] = { "msd", "-trestart", "200", "-lateral", "z", "-sel", "0" };
-    runTest(CommandLine(cmdline));
+    checker->checkRealFromString(value, nullptr);
 }
 
-TEST_F(MsdModuleTest, oneDimensionalDiffusion)
-{
-    setOutputFile("-o", "msd.xvg", XvgMatch());
-    const char* const cmdline[] = { "msd", "-trestart", "200", "-type", "x", "-sel", "0" };
-    runTest(CommandLine(cmdline));
-}
-
-// -------------------------------------------------------------------------
-// These tests use a custom matcher to check reported diffusion coefficients
-// ------------------------------------------------------------------------
-
+//! MsdMatcher is effectively an extension of XvgMatcher, which checks diffusion coefficients in
+//! addition to legends and data points.
 class MsdMatcher  : public ITextBlockMatcher
 {
 public:
@@ -123,66 +91,57 @@ public:
 
     void checkStream(TextInputStream* stream, TestReferenceChecker* checker) override {
         TestReferenceChecker dCoefficientChecker(checker->checkCompound("XvgLegend", "DiffusionCoefficient"));
+        TestReferenceChecker legendChecker(checker->checkCompound("XvgLegend", "Legend"));
+        TestReferenceChecker dataChecker(checker->checkCompound("XvgData", "Data"));
         std::string line;
+        int rowCount = 0;
         while (stream->readLine(&line)) {
-            if (!startsWith(line, "# D[")) {
+            // Skip unimportant comments.
+            if (startsWith(line, "#") && !startsWith(line, diffusionCoefficientLineHeader_)) {
                 continue;
             }
-            dCoefficientChecker.checkString(stripString(line.substr(1)), nullptr);
+            if (startsWith(line, "@") && !isRelevantXvgCommand(line)) {
+                continue;
+            }
+            // Comments that report coefficients
+            if (startsWith(line, "# D[")) {
+                dCoefficientChecker.checkString(stripString(line.substr(1)), nullptr);
+                continue;
+            }
+            // Legend and titles.
+            if (isRelevantXvgCommand(line)) {
+                legendChecker.checkString(stripString(line.substr(1)), nullptr);
+                continue;
+            }
+            // Actual data.
+            const std::vector<std::string> columns = splitString(line);
+            const std::string              id      = formatString("Row%d", rowCount);
+            dataChecker.checkSequence(columns.begin(), columns.end(), id.c_str(), &checkXvgDataPoint);
+            rowCount++;
         }
     }
+private:
+    static constexpr char diffusionCoefficientLineHeader_[] = "# D[";
 };
 
 class MsdMatch : public ITextBlockMatcherSettings
 {
 public:
-    TextBlockMatcherPointer createMatcher() const override{
+    [[nodiscard]] TextBlockMatcherPointer createMatcher() const override{
         return std::make_unique<MsdMatcher>();
     }
 };
 
-// for 3D, (8 + 4 + 0) / 3 should yield 4 cm^2 / s
-TEST_F(MsdModuleTest, threeDimensionalDiffusionCoefficient)
-{
-    setOutputFile("-o", "msd.xvg", MsdMatch());
-
-    const char* const cmdline[] = {
-        "msd", "-trestart", "200", "-sel", "0",
-    };
-    runTest(CommandLine(cmdline));
-}
-
-// for lateral z, (8 + 4) / 2 should yield 6 cm^2 /s
-TEST_F(MsdModuleTest, twoDimensionalDiffusionCoefficient)
-{
-    setOutputFile("-o", "msd.xvg", MsdMatch());
-    const char* const cmdline[] = { "msd", "-trestart", "200", "-lateral", "z", "-sel", "0" };
-    runTest(CommandLine(cmdline));
-}
-
-// for type x, should yield 8 cm^2 / s
-TEST_F(MsdModuleTest, oneDimensionalDiffusionCoefficient)
-{
-    setOutputFile("-o", "msd.xvg", MsdMatch());
-    const char* const cmdline[] = { "msd", "-trestart", "200", "-type", "x", "-sel", "0" };
-    runTest(CommandLine(cmdline));
-}
-
-
-class MsdMolTest : public gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::analysismodules::MsdInfo>
+class MsdModuleTest : public gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::analysismodules::MsdInfo>
 {
 public:
-    MsdMolTest()
+    MsdModuleTest()
     {
-        double    tolerance = 1e-5;
-        XvgMatch  xvg;
-        XvgMatch& toler = xvg.tolerance(gmx::test::relativeToleranceAsFloatingPoint(1, tolerance));
-        setOutputFile("-mol", "msdmol.xvg", toler);
+        setOutputFile("-o", "msd.xvg", MsdMatch());
     }
-
-    void executeTest(const CommandLine& args, const char* ndxfile, const std::string& simulationName)
-    {
-        setInputFile("-f", simulationName + ".pdb");
+    // Creates a TPR for the given starting structure and topology. Builds an mdp in place prior
+    // to calling grompp. sets the -s input to the generated tpr
+    void createTpr(const std::string& structure, const std::string& topology, const std::string& index) {
         std::string tpr = fileManager().getTemporaryFilePath(".tpr");
         std::string mdp = fileManager().getTemporaryFilePath(".mdp");
         FILE*       fp  = fopen(mdp.c_str(), "w");
@@ -193,49 +152,111 @@ public:
         fclose(fp);
 
         // Prepare a .tpr file
-        {
-            CommandLine caller;
-            auto        simDB = gmx::test::TestFileManager::getTestSimulationDatabaseDirectory();
-            auto        base  = gmx::Path::join(simDB, simulationName);
-            caller.append("grompp");
-            caller.addOption("-maxwarn", 0);
-            caller.addOption("-f", mdp.c_str());
-            std::string gro = (base + ".pdb");
-            caller.addOption("-c", gro.c_str());
-            std::string top = (base + ".top");
-            caller.addOption("-p", top.c_str());
-            std::string ndx = (base + ".ndx");
-            caller.addOption("-n", ndx.c_str());
-            caller.addOption("-o", tpr.c_str());
-            ASSERT_EQ(0, gmx_grompp(caller.argc(), caller.argv()));
-        }
-        // Run the MSD analysis
-        {
-            setInputFile("-n", ndxfile);
-            CommandLine& cmdline = commandLine();
-            cmdline.merge(args);
-            cmdline.addOption("-s", tpr.c_str());
-            runTest(cmdline);
-        }
+        CommandLine caller;
+        const auto * simDB = gmx::test::TestFileManager::getTestSimulationDatabaseDirectory();
+        caller.append("grompp");
+        caller.addOption("-maxwarn", 0);
+        caller.addOption("-f", mdp.c_str());
+        std::string gro = gmx::Path::join(simDB, structure);
+        caller.addOption("-c", gro.c_str());
+        std::string top = gmx::Path::join(simDB, topology);
+        caller.addOption("-p", top.c_str());
+        std::string ndx =  gmx::Path::join(simDB, index);
+        caller.addOption("-n", ndx.c_str());
+        caller.addOption("-o", tpr.c_str());
+        ASSERT_EQ(0, gmx_grompp(caller.argc(), caller.argv()));
+
+        // setInputFile() doesn't like the temporary tpr path.
+        CommandLine& cmdline = commandLine();
+        cmdline.addOption("-s", tpr.c_str());
+    }
+
+    // Convenience function to set input trajectory, tpr, and index, if all of the input files
+    // share a common prefix.
+    void setAllInputs(const std::string& prefix) {
+        setInputFile("-f", prefix + ".xtc");
+        setInputFile("-n", prefix + ".ndx");
+        createTpr(prefix +".gro", prefix + ".top", prefix + ".ndx");
     }
 };
 
+// ----------------------------------------------
+// These tests check the basic MSD and diffusion coefficient reporting capabilities on toy systems.
+// Trestart is set to larger than the size of the trajectory so that all frames are only compared
+// against the first frame and diffusion coefficients can be predicted exactly.
+// ----------------------------------------------
 
-// Test the diffusion per molecule output, mass weighted
-TEST_F(MsdMolTest, diffMolMassWeighted)
+// for 3D, (8 + 4 + 0) / 3 should yield 4 cm^2 / s
+TEST_F(MsdModuleTest, threeDimensionalDiffusion)
 {
-    const char* const cmdline[] = { "msd", "-trestart", "200" };
-    executeTest(CommandLine(cmdline), "spc5.ndx", "spc5");
+    setInputFile("-f", "msd_traj.xtc");
+    setInputFile("-s", "msd_coords.gro");
+    setInputFile("-n", "msd.ndx");
+    const char* const cmdline[] = {
+        "-trestart", "200", "-sel", "0",
+    };
+    runTest(CommandLine(cmdline));
 }
 
-// Test the diffusion per molecule output, non-mass weighted
-TEST_F(MsdMolTest, diffMolNonMassWeighted)
+// for lateral z, (8 + 4) / 2 should yield 6 cm^2 /s
+TEST_F(MsdModuleTest, twoDimensionalDiffusion)
 {
-    const char* const cmdline[] = { "msd", "-trestart", "200", "-mw", "no" };
-    executeTest(CommandLine(cmdline), "spc5.ndx", "spc5");
+    setInputFile("-f", "msd_traj.xtc");
+    setInputFile("-s", "msd_coords.gro");
+    setInputFile("-n", "msd.ndx");
+    const char* const cmdline[] = {"-trestart", "200", "-lateral", "z", "-sel", "0" };
+    runTest(CommandLine(cmdline));
 }
 
+// for type x, should yield 8 cm^2 / s
+TEST_F(MsdModuleTest, oneDimensionalDiffusion)
+{
+    setInputFile("-f", "msd_traj.xtc");
+    setInputFile("-s", "msd_coords.gro");
+    setInputFile("-n", "msd.ndx");
+    const char* const cmdline[] = {"-trestart", "200", "-type", "x", "-sel", "0" };
+    runTest(CommandLine(cmdline));
+}
+
+// -------------------------------------------------------------------------
+// These tests operate on a more realistic trajectory, with a solvated protein,
+// with 20 frames at a 2 ps dt. Note that this box is also non-square, so we're validating
+// non-trivial pbc removal.
+// ------------------------------------------------------------------------
+TEST_F(MsdModuleTest, multipleGroupsWork)
+{
+    setAllInputs("alanine_vsite_solvated");
+    // Restart every frame, select protein and water separately. Note that the reported diffusion
+    // coefficient for protein is nonsensical due to poor sampling - you can get a "negative" D
+    // from the linear fit.
+    const char* const cmdline[] = {"-trestart", "2", "-sel", "1;2"};
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, trestartLessThanDt)
+{
+    setAllInputs("alanine_vsite_solvated");
+    const char* const cmdline[] = {"-trestart", "1", "-sel", "2"};
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, trestartGreaterThanDt)
+{
+    setAllInputs("alanine_vsite_solvated");
+    const char* const cmdline[] = {"-trestart", "10", "-sel", "2"};
+    runTest(CommandLine(cmdline));
+}
+
+
+TEST_F(MsdModuleTest, molTest)
+{
+    setAllInputs("alanine_vsite_solvated");
+    setOutputFile("-mol", "diff_mol.xvg", MsdMatch());
+    const char* const cmdline[] = {"-trestart", "10", "-sel", "3"};
+    runTest(CommandLine(cmdline));
+}
 
 } // namespace
 
 }  // namespace gmx::test
+

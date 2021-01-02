@@ -403,19 +403,9 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         // is applied *after* per molecule coordinates have been consolidated into COMs.
         auto pbcRemover = [pbc] (RVec in, RVec prev)
         {
-          for (int dimension = 0; dimension < DIM; dimension++) {
-              // If we've moved in a negative direction more than half the box distance.
-              while (in[dimension] - prev[dimension] < -pbc->hbox_diag[dimension])
-              {
-                  in[dimension] = in[dimension] + pbc->fbox_diag[dimension];
-              }
-              // If we've moved in a positive direction more than half the box distance.
-              while (in[dimension] - prev[dimension] > pbc->hbox_diag[dimension])
-              {
-                  in[dimension] = in[dimension] - pbc->fbox_diag[dimension];
-              }
-          }
-          return in;
+            rvec dx;
+            pbc_dx(pbc, in, prev, dx);
+            return prev + dx;
         };
         // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
         // selections haven't been evaluated. No cross-box pbc removal for the first frame - note
