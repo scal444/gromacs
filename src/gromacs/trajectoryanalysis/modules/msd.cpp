@@ -158,6 +158,33 @@ enum class TwoDimDiffType : int {
     Count,
 };
 
+//! Holds per-group coordinates, analysis, and results.
+struct MsdGroupData {
+    //! Selection associated with this group.
+    Selection& sel;
+    // References to test-global data, for convenience. This allows us to create loops over the
+    // vector of GroupData without having to do integer indexing.
+    //! All times
+    std::vector<real>& times;
+    //! Times associated with stored frames
+    std::vector<real>& frameTimes;
+
+    //! Stored coordinates, indexed by frame then atom number.
+    std::vector<std::vector<RVec>> frames;
+    //! Frame n-1 - used for removing PBC jumps.
+    std::vector<RVec> previousFrame;
+
+    //! MSD result accumulator
+    MsdData msds;
+    //! Collector for processed MSD averages per tau
+    std::vector<real> msdSums;
+    //! Fitted diffusion coefficient
+    real diffusionCoefficient;
+    //! Uncertainty of diffusion coefficient
+    real sigma;
+};
+
+
 class Msd : public TrajectoryAnalysisModule
 {
 public:
@@ -188,31 +215,24 @@ private:
     real dt_ = -1;
     real beginFit_ = -1.0 ;
     real endFit_ = -1.0 ;
-    // Coordinates - first indexed by group, then by frame, then by atom
-    std::vector<std::vector<std::vector<RVec>>> frames_;
-    std::vector<std::vector<real>> frame_times_;
 
-    // Previous coordinates (indexed by group) - used for PBC correction.
-    std::vector<std::vector<RVec>> previousFrames_;
-    // Timestamp associated with coordinates
+    std::vector<MsdGroupData> groupData_;
+
+    // TODO remove with a function given t0 and dt
+    // Time of frames.
+    std::vector<real> frameTimes_;
+    // TODO same as above.
+    //! Timestamp associated with coordinates.
     std::vector<real> times_;
-    //! Result accumulator indexed by group
-    std::vector<MsdData> msds_;
-    //! Summed and averaged MSDs - indexed by group, then by tau.
-    std::vector<std::vector<real>> msd_sums_;
-    //! Calculated Diffusion coefficients, per group, as well as error estimates.
-    std::vector<real> diffusionCoefficients_;
-    std::vector<real> sigmas_;
-
     //! Taus for output - won't know the size until the end.
     std::vector<real> taus_;
 
     // MSD per-molecule stuff
     bool mol_selected_ = false;
-    // per group per mol atom count for COM calculation.
-    std::vector<std::vector<int>> mol_atom_counts_;
-    // Per group mol index vector
-    std::vector<std::vector<int>> mol_index_mappings_;
+    // Per mol atom count for COM calculation.
+    std::vector<int> mol_atom_counts_;
+    // Atom index -> mol index map
+    std::vector<int> mol_index_mappings_;
     // Stores the msd data of each molecule for group 1, indexed by molecule
     std::vector<MsdData> per_mol_msds_;
     std::vector<real> perMolDiffusionCoefficients_;
@@ -249,6 +269,7 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
                        description("Time between restarting points in trajectory (ps)").
                        defaultValue(10.0).
                        store(&trestart_));
+    // TODO enforce 1  mol group.
     options->addOption(FileNameOption("mol").filetype(eftPlot).outputFile()
                                .store(&mol_file_).storeIsSet(&mol_selected_).defaultBasename("diff_mol")
                                .description("Report diffusion coefficients for each molecule in selection"));
@@ -263,27 +284,32 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
 
 void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& top)
 {
-    const int numSelections = sel_.size();
-    // Accumulated frames and results
-    msds_.resize(numSelections);
-    frames_.resize(numSelections);
-    frame_times_.resize(numSelections);
-    previousFrames_.resize(numSelections);
-
-    // Processed result structures
-    msd_sums_.resize(numSelections);
-    diffusionCoefficients_.resize(numSelections);
-    sigmas_.resize(numSelections);
-
-    output_env_init(&oenv_, getProgramContext(), settings.timeUnit(), FALSE, settings.plotSettings().plotFormat(), 0);
-
-    // Parse dimensionality and assign the MSD calculating function.
+    // Initial parameter sanity checks.
     if (singleDimType_ != SingleDimDiffType::unused && twoDimType_ != TwoDimDiffType::unused) {
         std::string errorMessage =
                 "Options -type and -lateral are mutually exclusive. Choose one or neither.";
         GMX_THROW(InconsistentInputError(errorMessage.c_str()));
     }
+    if (sel_.size() > 1 && mol_selected_) {
+        std::string errorMessage = "Cannot have multiple groups selected with -sel when using -mol.";
+        GMX_THROW(InconsistentInputError(errorMessage.c_str()));
+    }
 
+    output_env_init(&oenv_, getProgramContext(), settings.timeUnit(), FALSE, settings.plotSettings().plotFormat(), 0);
+
+    const int numSelections = sel_.size();
+    // Accumulated frames and results
+    for (int i =0; i < numSelections; i++) {
+        // Initialize per group data with test-global references.
+        groupData_.push_back({
+         .sel = sel_[i],
+        .times = times_,
+        .frameTimes = frameTimes_,
+        });
+    }
+
+
+    // Parse dimensionality and assign the MSD calculating function.
     switch (singleDimType_) {
         case SingleDimDiffType::x:
             calcFn_ = CalcMsds<true, false, false>;
@@ -319,23 +345,17 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
 
     // TODO validate that we have mol info and not atom only.
     if (mol_selected_) {
-        mol_index_mappings_.resize(numSelections);
-        mol_atom_counts_.resize(numSelections);
-        for (int g = 0; g < numSelections; g++) {
-            int nMol = sel_[g].initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
-            if (g == 0)
-            {
-                per_mol_msds_.resize(nMol);
-                perMolDiffusionCoefficients_.resize(nMol);
-            }
-            gmx::ArrayRef<const int> mapped_ids = sel_[0].mappedIds();
-            mol_index_mappings_[g].resize(sel_[g].posCount());
-            std::copy(mapped_ids.begin(), mapped_ids.end(), mol_index_mappings_[g].begin());
+        Selection& sel = sel_[0];
+        int nMol = sel.initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
+        per_mol_msds_.resize(nMol);
+        perMolDiffusionCoefficients_.resize(nMol);
+        gmx::ArrayRef<const int> mapped_ids = sel_[0].mappedIds();
+        mol_index_mappings_.resize(sel_[0].posCount());
+        std::copy(mapped_ids.begin(), mapped_ids.end(), mol_index_mappings_.begin());
 
-            mol_atom_counts_[g].resize(nMol, 0);
-            for (int i = 0; i < sel_[g].posCount(); i++) {
-                mol_atom_counts_[g][mapped_ids[i]]++;
-            }
+        mol_atom_counts_.resize(nMol, 0);
+        for (int i = 0; i < sel.posCount(); i++) {
+            mol_atom_counts_[mapped_ids[i]]++;
         }
     }
 }
@@ -343,12 +363,8 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
 void Msd::initAfterFirstFrame(const TrajectoryAnalysisSettings& gmx_unused settings, const t_trxframe& fr)
 {
     t0_ = std::round(fr.time);
-    for (size_t g = 0; g < sel_.size(); g++) {
-        if (mol_selected_) {
-            previousFrames_[g].resize(mol_atom_counts_[g].size());
-        } else {
-            previousFrames_[g].resize(sel_[g].posCount());
-        }
+    for (MsdGroupData& msdData : groupData_) {
+        msdData.previousFrame.resize(mol_selected_ ? mol_atom_counts_.size() : msdData.sel.posCount());
     }
 }
 
@@ -360,31 +376,39 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
     if (dt_ < 0 && !times_.empty()) {
         dt_ = time - times_[0];
     }
+
+    // Each frame gets an entry in times, but frameTimes only updates if we're at a restart.
     times_.push_back(time);
+    if (bRmod(time, t0_, trestart_))
+    {
+        frameTimes_.push_back(time);
+    }
+
     // Each frame will get a tau between it and frame 0, and all other frame combos should be
     // covered by this.
     // TODO this will no longer hold exactly when maxtau is added
     taus_.push_back(time - times_[0]);
 
-    for (size_t g = 0; g < sel_.size(); g++)
+    for (MsdGroupData& msdData : groupData_)
     {
-        std::vector<RVec> coords(sel_[g].coordinates().begin(), sel_[g].coordinates().end());
+        // Shortcut to the selection object
+        Selection& sel =  msdData.sel;
+
+        std::vector<RVec> coords(sel.coordinates().begin(), sel.coordinates().end());
         // Do PBC removal
-
-
         if (mol_selected_) {
             // Do COM gathering for group 0 to get mol stuff. Note that pbc/com removal is already done
             // operate on vector[RVec] where each RVec is a mol COM
             // go to vector[molInd (0 based)]vector[tau]vector[entry] for summation.
 
             // First create a clear buffer
-            std::vector<RVec> mol_positions(mol_atom_counts_[g].size(), {0.0, 0.0, 0.0});
+            std::vector<RVec> mol_positions(mol_atom_counts_.size(), {0.0, 0.0, 0.0});
 
             // Sum up all positions
             // TODO mass weight.
-            for(int i = 0; i < sel_[g].posCount(); i++) {
-                const int mol_index = mol_index_mappings_[g][i];
-                mol_positions[mol_index] += coords[i] / mol_atom_counts_[g][mol_index];
+            for(int i = 0; i < sel.posCount(); i++) {
+                const int mol_index = mol_index_mappings_[i];
+                mol_positions[mol_index] += coords[i] / mol_atom_counts_[mol_index];
             }
 
             // Override the current coordinates.
@@ -413,25 +437,25 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         // AnalyzeFrame for frame 0, so when we store frame 0 there's no wonkiness.
         if (frnr != 0) {
 
-            std::transform(coords.begin(), coords.end(), previousFrames_[g].begin(), coords.begin(), pbcRemover);
+            std::transform(coords.begin(), coords.end(), msdData.previousFrame.begin(), coords.begin(), pbcRemover);
         }
         // Update "previous frame" for next rounds pbc removal. Note that for msd mol these coords
         // are actually the molecule COM.
-        std::copy(coords.begin(), coords.end(), previousFrames_[g].begin());
+        std::copy(coords.begin(), coords.end(), msdData.previousFrame.begin());
 
         // For each preceding frame, calculate tau and do comparison.
         // NOTE - as currently construed, one element is added to msds_ for each frame
-        for (size_t i = 0; i < frames_[g].size(); i++)
+        for (size_t i = 0; i < msdData.frames.size(); i++)
         {
-            real tau       = time - frame_times_[g][i];
+            real tau       = time - frameTimes_[i];
             long tau_index = gmx::roundToInt64(tau / dt_);
-            msds_[g].AddPoint(tau_index,  calcFn_(
+            msdData.msds.AddPoint(tau_index,  calcFn_(
                                                  coords.data(),
-                                                 frames_[g][i].data(),
-                                                 mol_selected_ ? per_mol_msds_.size() : sel_[g].posCount()));
-            if (g == 0 && mol_selected_) {
+                                                 msdData.frames[i].data(),
+                                                 mol_selected_ ? per_mol_msds_.size() : sel.posCount()));
+            if (mol_selected_) {
                 for (size_t molInd = 0; molInd < per_mol_msds_.size(); molInd++) {
-                    per_mol_msds_[molInd].AddPoint(tau_index, calcFn_(&coords[molInd], &frames_[g][i][molInd], 1));
+                    per_mol_msds_[molInd].AddPoint(tau_index, calcFn_(&coords[molInd], &msdData.frames[i][molInd], 1));
                 }
             }
         }
@@ -440,8 +464,7 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         // We only store the frame for the future if it's a restart per -trestart.
         if (bRmod(time, t0_, trestart_))
         {
-            frames_[g].push_back(std::move(coords));
-            frame_times_[g].push_back(time);
+            msdData.frames.push_back(std::move(coords));
         }
     }
 }
@@ -467,9 +490,8 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
     // available.
     real b = 0.0, corrCoef =0.0, chiSquared = 0.0;
 
-    for (size_t g = 0; g < sel_.size(); g++) {
-        msd_sums_[g] = msds_[g].AverageMsds();
-
+    for (MsdGroupData& msdData: groupData_) {
+        msdData.msdSums = msdData.msds.AverageMsds();
 
         if (numTaus >= 4)
         {
@@ -477,14 +499,14 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
             const int secondaryStartIndex = beginFitIndex + halfNumTaus;
             // Split the fit in 2, and compare the results of each fit;
             real a = 0.0, a2 = 0.0;
-            lsq_y_ax_b(halfNumTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &a, &b, &corrCoef, &chiSquared);
+            lsq_y_ax_b(halfNumTaus, &taus_[beginFitIndex], &msdData.msdSums[beginFitIndex], &a, &b, &corrCoef, &chiSquared);
             lsq_y_ax_b(halfNumTaus,
-                       &taus_[secondaryStartIndex], &msd_sums_[g][secondaryStartIndex], &a2, &b, &corrCoef, &chiSquared);
-            sigmas_[g] = std::abs(a - a2);
+                       &taus_[secondaryStartIndex], &msdData.msdSums[secondaryStartIndex], &a2, &b, &corrCoef, &chiSquared);
+            msdData.sigma = std::abs(a - a2);
         }
-        lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msd_sums_[g][beginFitIndex], &diffusionCoefficients_[g], &b, &corrCoef, &chiSquared);
-        diffusionCoefficients_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
-        sigmas_[g] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
+        lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msdData.msdSums[beginFitIndex], &msdData.diffusionCoefficient, &b, &corrCoef, &chiSquared);
+        msdData.diffusionCoefficient *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
+        msdData.sigma *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
     }
 
     if (!mol_selected_) {
@@ -513,26 +535,27 @@ void Msd::writeOutput() {
     FILE* out = xvgropen(out_file_.c_str(), "Mean Square Displacement",  output_env_get_xvgr_tlabel(oenv_),
                          "MSD (nm\\S2\\N)", oenv_);
     fprintf(out, "# MSD gathered over %g %s with %zu restarts\n", times_.back() - times_[0],
-            output_env_get_time_unit(oenv_).c_str(), frames_[0].size());
+            output_env_get_time_unit(oenv_).c_str(), groupData_[0].frames.size());
     fprintf(out, "# Diffusion constants fitted from time %g to %g %s\n", beginFit_, endFit_,
             output_env_get_time_unit(oenv_).c_str());
-    for (size_t g = 0; g < sel_.size(); g++) {
-        if (diffusionCoefficients_[g]  > 0.01 && diffusionCoefficients_[g] < 1e4)
+    for (const MsdGroupData& msdData: groupData_) {
+        const real D = msdData.diffusionCoefficient;
+        if (D > 0.01 && D < 1e4)
         {
             fprintf(out, "# D[%10s] = %.4f (+/- %.4f) (1e-5 cm^2/s)\n",
-                    sel_[g].name(), diffusionCoefficients_[g] , sigmas_[g]);
+                    msdData.sel.name(), D, msdData.sigma);
         }
         else
         {
             fprintf(out, "# D[%10s] = %.4g (+/- %.4f) (1e-5 cm^2/s)\n",
-                    sel_[g].name(), diffusionCoefficients_[g] , sigmas_[g]);
+                    msdData.sel.name(), D, msdData.sigma);
         }
     }
 
     for (size_t i = 0; i < taus_.size(); i++) {
         fprintf(out, "%10g", taus_[i]);
-        for (size_t g = 0; g < sel_.size(); g++) {
-            fprintf(out, "  %10g", msd_sums_[g][i]);
+        for (const MsdGroupData& msdData: groupData_) {
+            fprintf(out, "  %10g", msdData.msdSums[i]);
         }
         fprintf(out, "\n");
     }
