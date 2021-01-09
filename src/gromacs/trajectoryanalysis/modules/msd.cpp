@@ -234,6 +234,7 @@ private:
     // Atom index -> mol index map
     std::vector<int> mol_index_mappings_;
     // Stores the msd data of each molecule for group 1, indexed by molecule
+    std::vector<real> mol_masses_;
     std::vector<MsdData> per_mol_msds_;
     std::vector<real> perMolDiffusionCoefficients_;
 
@@ -343,7 +344,7 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
             break;
     }
 
-    // TODO validate that we have mol info and not atom only.
+    // TODO validate that we have mol info and not atom only - and masses.
     if (mol_selected_) {
         Selection& sel = sel_[0];
         int nMol = sel.initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
@@ -356,6 +357,14 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
         mol_atom_counts_.resize(nMol, 0);
         for (int i = 0; i < sel.posCount(); i++) {
             mol_atom_counts_[mapped_ids[i]]++;
+        }
+
+        // Precalculate each molecules mass for speeding up COM calculations.
+        mol_masses_.resize(nMol, 0);
+        ArrayRef<const real> masses = sel.masses();
+        // Sum up individual masses
+        for (int i = 0; i < sel.posCount(); i++) {
+            mol_masses_[mapped_ids[i]] += masses[i];
         }
     }
 }
@@ -405,11 +414,14 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
             std::vector<RVec> mol_positions(mol_atom_counts_.size(), {0.0, 0.0, 0.0});
 
             // Sum up all positions
-            // TODO mass weight.
+            gmx::ArrayRef<const real> masses = sel.masses();
             for(int i = 0; i < sel.posCount(); i++) {
                 const int mol_index = mol_index_mappings_[i];
-                mol_positions[mol_index] += coords[i] / mol_atom_counts_[mol_index];
+                // accumulate ri * mi, and do division at the end.
+                mol_positions[mol_index] += coords[i] * masses[i];
             }
+            // Divide accumulated mass * positions to get COM, reaccumulate in mol_masses.
+            std::transform(mol_positions.begin(), mol_positions.end(), mol_masses_.begin(), mol_positions.begin(), std::divides<>());
 
             // Override the current coordinates.
             coords = std::move(mol_positions);
