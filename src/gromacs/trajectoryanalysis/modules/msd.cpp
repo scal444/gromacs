@@ -78,18 +78,35 @@ constexpr double c_3DdiffusionDimensionFactor = 6.0;
 constexpr double c_2DdiffusionDimensionFactor = 4.0;
 constexpr double c_1DdiffusionDimensionFactor = 2.0;
 
-
+//! \brief Mean Squared Displacement data accumulator
+//!
+//! This class is used to accumulate individual MSD data points
+//! and emit tau-averaged results once data is finished collecting.
 class MsdData {
 public:
+    //! \brief Add an MSD data point for the given tau index
+    //!
+    //! Tau values have no correspondence to time, so whatever
+    //! indices are used for accumulation should be multiplied
+    //! by dt to recoup the actual tau value.
+    //!
+    //! \param tau_index  Time bucket the value corresponds to
+    //! \param value      MSD data point
     void AddPoint(size_t tau_index, real value);
+    //! \brief Compute per-tau MSDs averaged over all added points.
+    //!
+    //! The resulting vector is size(max tau index). Any indices
+    //! that have no data points have MSD set to 0.
+    //!
+    //! \return Average MSD per tau
     [[nodiscard]] std::vector<real> AverageMsds() const;
 
 private:
-    // Results - first indexed by tau, then data points
+    //! Results - first indexed by tau, then data points
     std::vector<std::vector<real>> msds_;
 };
 
-void MsdData::AddPoint(size_t tau_index, real value) {
+void MsdData::AddPoint(const size_t tau_index, const real value) {
     if (msds_.size() <= tau_index) {
         msds_.resize(tau_index + 1);
     }
@@ -114,8 +131,16 @@ std::vector<real> MsdData::AverageMsds() const {
     return msdSums;
 }
 
+//! \brief Calculates 1,2, or 3D distance for two vectors.
+//!
+//! \tparam x If true, calculate x dimension of displacement
+//! \tparam y If true, calculate y dimension of displacement
+//! \tparam z If true, calculate z dimension of displacement
+//! \param c1 First point
+//! \param c2 Second point
+//! \return Euclidian distance for the given dimension.
 template<bool x, bool y, bool z>
-inline real CalcSingleMsd(RVec c1, RVec c2) {
+inline real CalcSingleSquaredDistance(const RVec c1, const RVec c2) {
     real result = 0;
     if constexpr (x) {
         result += (c1[XX] - c2[XX]) * (c1[XX] - c2[XX]);
@@ -129,18 +154,29 @@ inline real CalcSingleMsd(RVec c1, RVec c2) {
     return result;
 }
 
+//! \brief Calculate average displacement between sets of points
+//!
+//! Each displacement c1[i] - c2[i] is calculated and the distances
+//! are averaged.
+//!
+//! \tparam x If true, calculate x dimension of displacement
+//! \tparam y If true, calculate y dimension of displacement
+//! \tparam z If true, calculate z dimension of displacement
+//! \param c1 First vector
+//! \param c2 Second vector
+//! \param num_vals
+//! \return Per-particle averaged distance
 template<bool x, bool y, bool z>
-real CalcMsds(const RVec* c1, const RVec* c2, const int num_vals) {
+real CalcAverageDisplacement(const RVec* c1, const RVec* c2, const int num_vals) {
     real result = 0;
     for (int i = 0; i < num_vals; i++) {
-        result += CalcSingleMsd<x,y,z>(c1[i], c2[i]);
+        result += CalcSingleSquaredDistance<x, y, z>(c1[i], c2[i]);
     }
     return result / num_vals;
 }
 
-}  // namespace
 
-// Describes 1D MSDs, in the given dimension.
+//! Describes 1D MSDs, in the given dimension.
 enum class SingleDimDiffType : int {
     unused = 0,
     x,
@@ -149,7 +185,7 @@ enum class SingleDimDiffType : int {
     Count,
 };
 
-// Describes 2D MSDs, in the plane normal to the given dimension.
+//! Describes 2D MSDs, in the plane normal to the given dimension.
 enum class TwoDimDiffType : int {
     unused = 0,
     xNormal,
@@ -169,11 +205,13 @@ struct MsdGroupData {
     //! Times associated with stored frames
     std::vector<real>& frameTimes;
 
+    // Coordinate storage
     //! Stored coordinates, indexed by frame then atom number.
     std::vector<std::vector<RVec>> frames;
     //! Frame n-1 - used for removing PBC jumps.
     std::vector<RVec> previousFrame;
 
+    // Result accumulation and calculation
     //! MSD result accumulator
     MsdData msds;
     //! Collector for processed MSD averages per tau
@@ -184,7 +222,16 @@ struct MsdGroupData {
     real sigma;
 };
 
+}  // namespace
 
+//! \brief Implements the gmx msd module
+//!
+//! \todo Implement -beginfit, -endfit and add tests. Right now, we're fixed at 10% and 90% for fitting
+//! \todo Implement -(no)mw. Right now, all calculations are mass-weighted with -mol, and not otherwise
+//! \todo Implement -tensor for full MSD tensor calculation
+//! \todo Implement -rmcomm for total-frame COM removal
+//! \todo Implement -pdb for molecule B factors
+//! \todo Implement -maxtau option proposed at https://gitlab.com/gromacs/gromacs/-/issues/3870
 class Msd : public TrajectoryAnalysisModule
 {
 public:
@@ -202,11 +249,15 @@ private:
     //! Selections for MSD output
     SelectionList sel_;
 
-    // MSD type information
+    // MSD dimensionality related quantities
+    //! MSD type information, for -type {x,y,z}
     SingleDimDiffType singleDimType_ = SingleDimDiffType::unused;
+    //! MSD type information, for -lateral {x,y,z}
     TwoDimDiffType twoDimType_ = TwoDimDiffType::unused;
+    //! Diffusion coefficient conversion factor
     double            diffusionCoefficientDimensionFactor_     = c_3DdiffusionDimensionFactor;
-    std::function<real(const RVec*, const RVec*, int)> calcFn_ = CalcMsds<true, true, true>;
+    //! Method used to calculate MSD - changes based on dimensonality.
+    std::function<real(const RVec*, const RVec*, int)> calcFn_ = CalcAverageDisplacement<true, true, true>;
 
     // Defaults - to hook up to option machinery when ready
     //! Picoseconds between restarts
@@ -216,6 +267,7 @@ private:
     real beginFit_ = -1.0 ;
     real endFit_ = -1.0 ;
 
+    //! All selection group-specific data stored here.
     std::vector<MsdGroupData> groupData_;
 
     // TODO remove with a function given t0 and dt
@@ -228,18 +280,23 @@ private:
     std::vector<real> taus_;
 
     // MSD per-molecule stuff
+    //! Are we doing molecule COM-based MSDs?
     bool mol_selected_ = false;
-    // Per mol atom count for COM calculation.
+    //! Per mol atom count for COM calculation.
     std::vector<int> mol_atom_counts_;
-    // Atom index -> mol index map
+    //! Atom index -> mol index map
     std::vector<int> mol_index_mappings_;
-    // Stores the msd data of each molecule for group 1, indexed by molecule
+    //! Stores the msd data of each molecule for group 1, indexed by molecule
     std::vector<real> mol_masses_;
+    //! Data accumulators for each molecule.
     std::vector<MsdData> per_mol_msds_;
+    //! Results for each molecule.
     std::vector<real> perMolDiffusionCoefficients_;
 
-    //! Output stuff
+    // Output stuff
+    //! Per-tau MSDs for each selected group
     std::string out_file_;
+    //! Per molecule diffusion coefficients if -mol is selected.
     std::string mol_file_;
     gmx_output_env_t* oenv_ = nullptr;
 };
@@ -251,44 +308,50 @@ Msd::~Msd() {
 }
 
 
-
 void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* settings)
 {
     static const char* const desc[] = {
         "[THISMODULE] computes MSDs via GPU. PBC not yet supported, nor any other features."
     };
-
     settings->setHelpText(desc);
 
+    // Selections
+    options->addOption(SelectionOption("sel").storeVector(&sel_).required().onlyStatic().multiValue().description(
+            "Selections to compute MSDs for from the reference"));
+
+    // Select MSD type - defaults to 3D if neither option is selected.
+    EnumerationArray<SingleDimDiffType, const char*> enumTypeNames = {"unselected", "x", "y", "z"};
+    EnumerationArray<TwoDimDiffType, const char*> enumLateralNames = {"unselected", "x", "y", "z"};
+    options->addOption(EnumOption<SingleDimDiffType>("type").enumValue(enumTypeNames).store(&singleDimType_).defaultValue(SingleDimDiffType::unused));
+    options->addOption(EnumOption<TwoDimDiffType>("lateral").enumValue(enumLateralNames).store(&twoDimType_).defaultValue(TwoDimDiffType::unused));
+
+    options->addOption(RealOption("trestart").
+            description("Time between restarting points in trajectory (ps)").
+            defaultValue(10.0).
+            store(&trestart_));
+
+    // Output options
     options->addOption(FileNameOption("o")
                                .filetype(eftPlot)
                                .outputFile()
                                .store(&out_file_)
                                .defaultBasename("msdout")
                                .description("MSD output"));
-    options->addOption(RealOption("trestart").
-                       description("Time between restarting points in trajectory (ps)").
-                       defaultValue(10.0).
-                       store(&trestart_));
-    // TODO enforce 1  mol group.
     options->addOption(FileNameOption("mol").filetype(eftPlot).outputFile()
                                .store(&mol_file_).storeIsSet(&mol_selected_).defaultBasename("diff_mol")
                                .description("Report diffusion coefficients for each molecule in selection"));
 
-    EnumerationArray<SingleDimDiffType, const char*> enumTypeNames = {"unselected", "x", "y", "z"};
-    EnumerationArray<TwoDimDiffType, const char*> enumLateralNames = {"unselected", "x", "y", "z"};
-    options->addOption(EnumOption<SingleDimDiffType>("type").enumValue(enumTypeNames).store(&singleDimType_).defaultValue(SingleDimDiffType::unused));
-    options->addOption(EnumOption<TwoDimDiffType>("lateral").enumValue(enumLateralNames).store(&twoDimType_).defaultValue(TwoDimDiffType::unused));
-    options->addOption(SelectionOption("sel").storeVector(&sel_).required().onlyStatic().multiValue().description(
-            "Selections to compute MSDs for from the reference"));
+
+
+
 }
 
 void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, const TopologyInformation& top)
 {
-    // Initial parameter sanity checks.
+    // Initial parameter consistency checks.
     if (singleDimType_ != SingleDimDiffType::unused && twoDimType_ != TwoDimDiffType::unused) {
         std::string errorMessage =
-                "Options -type and -lateral are mutually exclusive. Choose one or neither.";
+                "Options -type and -lateral are mutually exclusive. Choose one or neither (for 3D MSDs).";
         GMX_THROW(InconsistentInputError(errorMessage.c_str()));
     }
     if (sel_.size() > 1 && mol_selected_) {
@@ -313,15 +376,15 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     // Parse dimensionality and assign the MSD calculating function.
     switch (singleDimType_) {
         case SingleDimDiffType::x:
-            calcFn_ = CalcMsds<true, false, false>;
+            calcFn_ = CalcAverageDisplacement<true, false, false>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         case SingleDimDiffType::y:
-            calcFn_ = CalcMsds<false, true, false>;
+            calcFn_ = CalcAverageDisplacement<false, true, false>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         case SingleDimDiffType::z:
-            calcFn_ = CalcMsds<false, false, true>;
+            calcFn_ = CalcAverageDisplacement<false, false, true>;
             diffusionCoefficientDimensionFactor_ = c_1DdiffusionDimensionFactor;
             break;
         default:
@@ -329,27 +392,26 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
     }
     switch (twoDimType_) {
         case TwoDimDiffType::xNormal:
-            calcFn_ = CalcMsds<false, true, true>;
+            calcFn_ = CalcAverageDisplacement<false, true, true>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         case TwoDimDiffType::yNormal:
-            calcFn_ = CalcMsds<true, false, true>;
+            calcFn_ = CalcAverageDisplacement<true, false, true>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         case TwoDimDiffType::zNormal:
-            calcFn_ = CalcMsds<true, true, false>;
+            calcFn_ = CalcAverageDisplacement<true, true, false>;
             diffusionCoefficientDimensionFactor_ = c_2DdiffusionDimensionFactor;
             break;
         default:
             break;
     }
 
-    // TODO validate that we have mol info and not atom only - and masses.
+    // TODO validate that we have mol info and not atom only - and masses, and topology.
     if (mol_selected_) {
         Selection& sel = sel_[0];
-        int nMol = sel.initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
-        per_mol_msds_.resize(nMol);
-        perMolDiffusionCoefficients_.resize(nMol);
+        const int nMol = sel.initOriginalIdsToGroup(top.mtop(), INDEX_MOL);
+
         gmx::ArrayRef<const int> mapped_ids = sel_[0].mappedIds();
         mol_index_mappings_.resize(sel_[0].posCount());
         std::copy(mapped_ids.begin(), mapped_ids.end(), mol_index_mappings_.begin());
@@ -359,8 +421,11 @@ void Msd::initAnalysis(const TrajectoryAnalysisSettings& gmx_unused settings, co
             mol_atom_counts_[mapped_ids[i]]++;
         }
 
-        // Precalculate each molecules mass for speeding up COM calculations.
+        per_mol_msds_.resize(nMol);
+        perMolDiffusionCoefficients_.resize(nMol);
         mol_masses_.resize(nMol, 0);
+
+        // Precalculate each molecules mass for speeding up COM calculations.
         ArrayRef<const real> masses = sel.masses();
         // Sum up individual masses
         for (int i = 0; i < sel.posCount(); i++) {
@@ -395,7 +460,7 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
 
     // Each frame will get a tau between it and frame 0, and all other frame combos should be
     // covered by this.
-    // TODO this will no longer hold exactly when maxtau is added
+    // \todo this will no longer hold exactly when maxtau is added
     taus_.push_back(time - times_[0]);
 
     for (MsdGroupData& msdData : groupData_)
@@ -404,20 +469,17 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         Selection& sel =  msdData.sel;
 
         std::vector<RVec> coords(sel.coordinates().begin(), sel.coordinates().end());
-        // Do PBC removal
-        if (mol_selected_) {
-            // Do COM gathering for group 0 to get mol stuff. Note that pbc/com removal is already done
-            // operate on vector[RVec] where each RVec is a mol COM
-            // go to vector[molInd (0 based)]vector[tau]vector[entry] for summation.
 
-            // First create a clear buffer
+        if (mol_selected_) {
+            // Do COM gathering for group 0 to get mol stuff. Note that per-molecule PBC removal is already done.
+            // First create a clear buffer.
             std::vector<RVec> mol_positions(mol_atom_counts_.size(), {0.0, 0.0, 0.0});
 
             // Sum up all positions
             gmx::ArrayRef<const real> masses = sel.masses();
             for(int i = 0; i < sel.posCount(); i++) {
                 const int mol_index = mol_index_mappings_[i];
-                // accumulate ri * mi, and do division at the end.
+                // accumulate ri * mi, and do division at the end to minimize number of divisions.
                 mol_positions[mol_index] += coords[i] * masses[i];
             }
             // Divide accumulated mass * positions to get COM, reaccumulate in mol_masses.
@@ -443,12 +505,10 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
             pbc_dx(pbc, in, prev, dx);
             return prev + dx;
         };
-        // If on frame 0, set up as "previous" frame. We can't set up on initAfterFirstFrame since
-        // selections haven't been evaluated. No cross-box pbc removal for the first frame - note
+        // No cross-box pbc removal for the first frame - note
         // that while initAfterFirstFrame does not do per-mol PBC removal, it is done prior to
         // AnalyzeFrame for frame 0, so when we store frame 0 there's no wonkiness.
         if (frnr != 0) {
-
             std::transform(coords.begin(), coords.end(), msdData.previousFrame.begin(), coords.begin(), pbcRemover);
         }
         // Update "previous frame" for next rounds pbc removal. Note that for msd mol these coords
@@ -456,7 +516,6 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
         std::copy(coords.begin(), coords.end(), msdData.previousFrame.begin());
 
         // For each preceding frame, calculate tau and do comparison.
-        // NOTE - as currently construed, one element is added to msds_ for each frame
         for (size_t i = 0; i < msdData.frames.size(); i++)
         {
             real tau       = time - frameTimes_[i];
@@ -483,10 +542,10 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
 
 void Msd::finishAnalysis(int gmx_unused nframes) {
 
-    // If unspecified, calculate beginfit and endfit as 10% and 90% indices.
+    // If unspecified, calculate beginfit and endfit as 10% and 90%.
     int beginFitIndex = 0;
     int endFitIndex = 0;
-    // TODO - the else clause when beginfit and endfit are supported.
+    // TODO - the else clause when beginfit and endfit parameters are supported.
     if (beginFit_ < 0) {
         beginFitIndex = gmx::roundToInt(taus_.size() * 0.1);
         beginFit_ = taus_[beginFitIndex];
@@ -530,11 +589,6 @@ void Msd::finishAnalysis(int gmx_unused nframes) {
         lsq_y_ax_b(numTaus, &taus_[beginFitIndex], &msds[beginFitIndex], &perMolDiffusionCoefficients_[i], &b, &corrCoef, & chiSquared);
         perMolDiffusionCoefficients_[i] *= c_diffusionConversionFactor / diffusionCoefficientDimensionFactor_;
     }
-
-
-
-
-
 }
 
 void Msd::writeOutput() {
