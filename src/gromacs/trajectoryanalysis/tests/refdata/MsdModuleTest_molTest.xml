@@ -5,7 +5,9 @@
   <OutputFiles Name="Files">
     <File Name="-o">
       <XvgLegend Name="DiffusionCoefficient">
-        <String>D[some_water_subset] = 3.6667 (+/- 1.2045) (1e-5 cm^2/s)</String>
+        <String>MSD gathered over 40 ps with 5 restarts</String>
+        <String>Diffusion constants fitted from time 4 to 36 ps</String>
+        <String>D[some_water_subset] = 3.9792 (+/- 0.4600) (1e-5 cm^2/s)</String>
       </XvgLegend>
       <XvgLegend Name="Legend">
         <String>title "Mean Square Displacement"</String>
@@ -133,32 +135,32 @@
         <Sequence Name="Row0">
           <Int Name="Length">2</Int>
           <Real>0</Real>
-          <Real>3.16231</Real>
+          <Real>4.12116</Real>
         </Sequence>
         <Sequence Name="Row1">
           <Int Name="Length">2</Int>
           <Real>1</Real>
-          <Real>2.04347</Real>
+          <Real>2.41689</Real>
         </Sequence>
         <Sequence Name="Row2">
           <Int Name="Length">2</Int>
           <Real>2</Real>
-          <Real>3.06331</Real>
+          <Real>3.28288</Real>
         </Sequence>
         <Sequence Name="Row3">
           <Int Name="Length">2</Int>
           <Real>3</Real>
-          <Real>3.4576</Real>
+          <Real>3.2071</Real>
         </Sequence>
         <Sequence Name="Row4">
           <Int Name="Length">2</Int>
           <Real>4</Real>
-          <Real>9.15847</Real>
+          <Real>9.87093</Real>
         </Sequence>
         <Sequence Name="Row5">
           <Int Name="Length">2</Int>
           <Real>5</Real>
-          <Real>1.11493</Real>
+          <Real>0.976476</Real>
         </Sequence>
       </XvgData>
     </File>

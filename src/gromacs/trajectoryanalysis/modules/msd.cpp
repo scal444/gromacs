@@ -226,7 +226,6 @@ struct MsdGroupData {
 
 //! \brief Implements the gmx msd module
 //!
-//! \todo Implement -beginfit, -endfit and add tests. Right now, we're fixed at 10% and 90% for fitting
 //! \todo Implement -(no)mw. Right now, all calculations are mass-weighted with -mol, and not otherwise
 //! \todo Implement -tensor for full MSD tensor calculation
 //! \todo Implement -rmcomm for total-frame COM removal
@@ -329,6 +328,8 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
             description("Time between restarting points in trajectory (ps)").
             defaultValue(10.0).
             store(&trestart_));
+    options->addOption(RealOption("beginfit").description("").store(&beginFit_));
+    options->addOption(RealOption("endfit").description("").store(&endFit_));
 
     // Output options
     options->addOption(FileNameOption("o")
@@ -543,17 +544,21 @@ void Msd::analyzeFrame(int gmx_unused frnr, const t_trxframe& fr, t_pbc* gmx_unu
 void Msd::finishAnalysis(int gmx_unused nframes) {
 
     // If unspecified, calculate beginfit and endfit as 10% and 90%.
-    int beginFitIndex = 0;
-    int endFitIndex = 0;
-    // TODO - the else clause when beginfit and endfit parameters are supported.
+    size_t beginFitIndex = 0;
+    size_t endFitIndex = taus_.size() - 1;
     if (beginFit_ < 0) {
-        beginFitIndex = gmx::roundToInt(taus_.size() * 0.1);
+        beginFitIndex = std::max<size_t>(beginFitIndex, gmx::roundToInt((taus_.size() - 1) * 0.1));
         beginFit_ = taus_[beginFitIndex];
     }
+    else {
+        beginFitIndex = std::max<size_t>(beginFitIndex, gmx::roundToInt(beginFit_ / dt_));
+    }
     if (endFit_ < 0) {
-        const size_t maybeMaxIndex = gmx::roundToInt(taus_.size() * 0.9);
-        endFitIndex = maybeMaxIndex >= taus_.size() ? taus_.size() - 1 : maybeMaxIndex;
+        endFitIndex = std::min<size_t>(endFitIndex, gmx::roundToInt((taus_.size() - 1) * 0.9));
         endFit_ = taus_[endFitIndex];
+    }
+    else {
+        endFitIndex = std::min<size_t>(endFitIndex, gmx::roundToInt(endFit_ / dt_));
     }
     const int numTaus = 1 + endFitIndex - beginFitIndex;
 

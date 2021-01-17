@@ -5,6 +5,8 @@
   <OutputFiles Name="Files">
     <File Name="-o">
       <XvgLegend Name="DiffusionCoefficient">
+        <String>MSD gathered over 9 ps with 1 restarts</String>
+        <String>Diffusion constants fitted from time 1 to 8 ps</String>
         <String>D[ particles] = 6.0000 (+/- 0.0000) (1e-5 cm^2/s)</String>
       </XvgLegend>
       <XvgLegend Name="Legend">

@@ -5,7 +5,9 @@
   <OutputFiles Name="Files">
     <File Name="-o">
       <XvgLegend Name="DiffusionCoefficient">
-        <String>D[     Water] = 5.4965 (+/- 0.5120) (1e-5 cm^2/s)</String>
+        <String>MSD gathered over 40 ps with 21 restarts</String>
+        <String>Diffusion constants fitted from time 4 to 36 ps</String>
+        <String>D[     Water] = 5.4502 (+/- 0.2739) (1e-5 cm^2/s)</String>
       </XvgLegend>
       <XvgLegend Name="Legend">
         <String>title "Mean Square Displacement"</String>

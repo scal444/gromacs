@@ -70,7 +70,7 @@ using gmx::test::CommandLine;
 // \todo This is mostly taken from xvgtest.cpp. We could probably create some modular checker
 // functionality where each line is compared against a set of subcheckers automatically. Then we
 // could build matchers like this out of the modular components.
-bool isRelevantXvgCommand(const std::string& line)
+bool isRelevantXvgHeader(const std::string& line)
 {
     return startsWith(line, "@") && (contains(line, " title ") || contains(line, " subtitle ") || contains(line, " label ")
                                      || contains(line, "@TYPE ") || contains(line, " legend \""));
@@ -96,21 +96,23 @@ public:
         std::string line;
         int rowCount = 0;
         while (stream->readLine(&line)) {
-            // Skip unimportant comments.
-            if (startsWith(line, "#") && !startsWith(line, diffusionCoefficientLineHeader_)) {
-                continue;
-            }
-            if (startsWith(line, "@") && !isRelevantXvgCommand(line)) {
-                continue;
-            }
-            // Comments that report coefficients
-            if (startsWith(line, "# D[")) {
+            // Comments that report coefficients / fitting
+            if (startsWith(line, "# D[") ||
+                contains(line, "MSD gathered over") ||
+                contains(line, "Diffusion constants fitted from time"))
+            {
                 dCoefficientChecker.checkString(stripString(line.substr(1)), nullptr);
                 continue;
             }
             // Legend and titles.
-            if (isRelevantXvgCommand(line)) {
+            if (isRelevantXvgHeader(line))
+            {
                 legendChecker.checkString(stripString(line.substr(1)), nullptr);
+                continue;
+            }
+            // All other comment lines we don't care about.
+            if (startsWith(line, "#") || startsWith(line, "@"))
+            {
                 continue;
             }
             // Actual data.
@@ -120,8 +122,6 @@ public:
             rowCount++;
         }
     }
-private:
-    static constexpr char diffusionCoefficientLineHeader_[] = "# D[";
 };
 
 class MsdMatch : public ITextBlockMatcherSettings
@@ -222,13 +222,14 @@ TEST_F(MsdModuleTest, oneDimensionalDiffusion)
 // These tests operate on a more realistic trajectory, with a solvated protein,
 // with 20 frames at a 2 ps dt. Note that this box is also non-square, so we're validating
 // non-trivial pbc removal.
+
+// Group 1 = protein, 2 = all waters, 3 = a subset of 6 water molecules
 // ------------------------------------------------------------------------
 TEST_F(MsdModuleTest, multipleGroupsWork)
 {
     setAllInputs("alanine_vsite_solvated");
     // Restart every frame, select protein and water separately. Note that the reported diffusion
-    // coefficient for protein is nonsensical due to poor sampling - you can get a "negative" D
-    // from the linear fit.
+    // coefficient for protein is not well-sampled and doesn't correspond to anything physical.
     const char* const cmdline[] = {"-trestart", "2", "-sel", "1;2"};
     runTest(CommandLine(cmdline));
 }
@@ -247,12 +248,25 @@ TEST_F(MsdModuleTest, trestartGreaterThanDt)
     runTest(CommandLine(cmdline));
 }
 
-
 TEST_F(MsdModuleTest, molTest)
 {
     setAllInputs("alanine_vsite_solvated");
     setOutputFile("-mol", "diff_mol.xvg", MsdMatch());
     const char* const cmdline[] = {"-trestart", "10", "-sel", "3"};
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, beginFit)
+{
+    setAllInputs("alanine_vsite_solvated");
+    const char* const cmdline[] = {"-trestart", "2", "-sel", "3", "-beginfit", "20"};
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, endFit)
+{
+    setAllInputs("alanine_vsite_solvated");
+    const char* const cmdline[] = {"-trestart", "2", "-sel", "3", "-endfit", "25"};
     runTest(CommandLine(cmdline));
 }
 
