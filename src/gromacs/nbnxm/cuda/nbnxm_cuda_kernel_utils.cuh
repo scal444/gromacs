@@ -512,13 +512,9 @@ reduce_force_i(float* f_buf, float3* f, float* fshift_buf, bool bCalcFshift, int
 /*! Final i-force reduction; this implementation works only with power of two
  *  array sizes.
  */
-static __forceinline__ __device__ void reduce_force_i_warp_shfl(float3             fin,
-                                                                float3*            fout,
-                                                                float*             fshift_buf,
-                                                                bool               bCalcFshift,
-                                                                int                tidxj,
-                                                                int                aidx,
-                                                                const unsigned int activemask)
+static __forceinline__ __device__ float reduce_force_i_warp_shfl_value(float3 fin,
+                                                                       int    tidxj,
+                                                                       const unsigned int activemask)
 {
     fin.x += __shfl_down_sync(activemask, fin.x, c_clusterSize);
     fin.y += __shfl_up_sync(activemask, fin.y, c_clusterSize);
@@ -537,14 +533,28 @@ static __forceinline__ __device__ void reduce_force_i_warp_shfl(float3          
         fin.x = fin.z;
     }
 
+    return fin.x;
+}
+
+/*! Final i-force reduction and global accumulation. */
+static __forceinline__ __device__ void reduce_force_i_warp_shfl(float3             fin,
+                                                                float3*            fout,
+                                                                float*             fshift_buf,
+                                                                bool               bCalcFshift,
+                                                                int                tidxj,
+                                                                int                aidx,
+                                                                const unsigned int activemask)
+{
+    const float reducedForce = reduce_force_i_warp_shfl_value(fin, tidxj, activemask);
+
     /* Threads 0,1,2 and 4,5,6 increment x,y,z for their warp */
     if ((tidxj & 3) < 3)
     {
-        atomicAdd(&fout[aidx].x + (tidxj & 3), fin.x);
+        atomicAdd(&fout[aidx].x + (tidxj & 3), reducedForce);
 
         if (bCalcFshift)
         {
-            *fshift_buf += fin.x;
+            *fshift_buf += reducedForce;
         }
     }
 }

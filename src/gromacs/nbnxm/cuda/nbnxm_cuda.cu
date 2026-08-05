@@ -393,6 +393,17 @@ static const nbnxm_cu_kfunc_ptr_t nb_kfunc_ener_prune_ptr[c_numElecTypes][c_numV
 #endif
 };
 
+constexpr int c_nbnxmJPackedSplitFactor = 4;
+
+/*! Whether to use the four-CTA packed-J force-kernel specialization. */
+static bool useNbnxmJPackedSplitKernel(const ElecType elecType,
+                                       const VdwType  vdwType,
+                                       const bool     bDoEne,
+                                       const bool     bDoPrune)
+{
+    return !bDoEne && !bDoPrune && elecType == ElecType::EwaldAna && vdwType == VdwType::CutCombGeom;
+}
+
 /*! Return a pointer to the kernel version to be executed at the current step. */
 static inline nbnxm_cu_kfunc_ptr_t select_nbnxm_kernel(enum ElecType elecType,
                                                        enum VdwType  vdwType,
@@ -414,6 +425,11 @@ static inline nbnxm_cu_kfunc_ptr_t select_nbnxm_kernel(enum ElecType elecType,
                "The CUDA kernels require the "
                "cluster_size_i*cluster_size_j/nbnxm_gpu_clusterpair_split to match the warp size "
                "of the architecture targeted.");
+
+    if (useNbnxmJPackedSplitKernel(elecType, vdwType, bDoEne, bDoPrune))
+    {
+        return nbnxm_kernel_ElecEw_VdwLJCombGeom_F_splitJ4_cuda;
+    }
 
     if (bDoEne)
     {
@@ -565,17 +581,27 @@ void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const In
      *   and j-cluster concurrency, in x, y, and z, respectively.
      * - The 1D block-grid contains as many blocks as super-clusters.
      */
+    /* Whether we need to call a combined prune and interaction kernel or just an interaction
+     * kernel. bDoPrune being true implies we are not using dynamic pruning and are in the first
+     * call to the interaction kernel after a neighbour list step */
+    const bool bDoPrune = (plist->haveFreshList && !nb->timers->interaction[iloc].didPrune);
+    const bool useJPackedSplitKernel =
+            useNbnxmJPackedSplitKernel(nbp->elecType, nbp->vdwType, stepWork.computeEnergy, bDoPrune);
+
     int num_threads_z = 1;
-    int nblock        = calc_nb_kernel_nblock(plist->numSci, &nb->deviceContext.deviceInfo());
+    const int numWorkUnits = plist->numSci * (useJPackedSplitKernel ? c_nbnxmJPackedSplitFactor : 1);
+    int nblock = calc_nb_kernel_nblock(numWorkUnits, &nb->deviceContext.deviceInfo());
 
 
     KernelLaunchConfig config;
-    config.blockSize[0] = c_clusterSize;
-    config.blockSize[1] = c_clusterSize;
-    config.blockSize[2] = num_threads_z;
-    config.gridSize[0]  = nblock;
-    config.sharedMemorySize =
-            calc_shmem_required_nonbonded(num_threads_z, &nb->deviceContext.deviceInfo(), nbp);
+    config.blockSize[0]     = c_clusterSize;
+    config.blockSize[1]     = c_clusterSize;
+    config.blockSize[2]     = num_threads_z;
+    config.gridSize[0]      = nblock;
+    config.sharedMemorySize = useJPackedSplitKernel
+                                      ? 0
+                                      : calc_shmem_required_nonbonded(
+                                              num_threads_z, &nb->deviceContext.deviceInfo(), nbp);
 
     if (debug)
     {
@@ -596,11 +622,7 @@ void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const In
 
     auto* timingEvent = bDoTime ? timers->interaction[iloc].nb_k.fetchNextEvent() : nullptr;
 
-    /* Whether we need to call a combined prune and interaction kernel or just an interaction
-     * kernel. bDoPrune being true implies we are not using dynamic pruning and are in the first
-     * call to the interaction kernel after a neighbour list step */
-    bool       bDoPrune = (plist->haveFreshList && !nb->timers->interaction[iloc].didPrune);
-    const auto kernel   = select_nbnxm_kernel(
+    const auto kernel = select_nbnxm_kernel(
             nbp->elecType, nbp->vdwType, stepWork.computeEnergy, bDoPrune, &nb->deviceContext.deviceInfo());
     const auto kernelArgs =
             prepareGpuKernelArguments(kernel, config, adat, nbp, plist, &stepWork.computeVirial);

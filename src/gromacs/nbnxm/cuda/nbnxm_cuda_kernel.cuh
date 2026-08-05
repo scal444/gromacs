@@ -90,7 +90,8 @@ namespace gmx
 
 /*
    Kernel launch parameters:
-    - #blocks   = #pair lists, blockId = pair list Id
+    - #blocks   = #pair lists * NBNXM_JPACKED_SPLIT_FACTOR for the split-J
+                  specialization, otherwise #pair lists
     - #threads  = NTHREAD_Z * c_clusterSize^2
     - shmem     = see nbnxm_cuda.cu:calc_shmem_required_nonbonded()
 
@@ -132,6 +133,7 @@ namespace gmx
 #define NTHREAD_Z (1)
 #define MIN_BLOCKS_PER_MP (16)
 #define THREADS_PER_BLOCK (c_clusterSize * c_clusterSize * NTHREAD_Z)
+#define NBNXM_FORCE_COMPONENT_COUNT (3)
 
 /**@}*/
 
@@ -217,7 +219,14 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
 #    else
     unsigned int tidxz = threadIdx.z;
 #    endif
-    unsigned int bidx = blockIdx.x;
+#    ifdef NBNXM_JPACKED_SPLIT_FACTOR
+    static_assert(NBNXM_JPACKED_SPLIT_FACTOR == 4);
+    const unsigned int bidx        = blockIdx.x >> 2;
+    const unsigned int jPackedPart = blockIdx.x & 3;
+#    else
+    const unsigned int bidx        = blockIdx.x;
+    const unsigned int jPackedPart = tidxz;
+#    endif
     /* In cuda 13.1 and earlier, nvcc fails to identify that widx is identical within a warp,
      * and issues unnecessary warp synchronization assembly instructions on dependent `if (imask)`
      * branches, which happen in the inner loop. Broadcasting the value to the warp via shuffle
@@ -264,7 +273,11 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
     // - sm_75: improvements +/- very small
     // - sm_61: tested and slower without preload
     // - sm_6x and earlier not tested to
+#    ifdef NBNXM_JPACKED_SPLIT_FACTOR
+    constexpr bool c_preloadCj = false;
+#    else
     constexpr bool c_preloadCj = (GMX_PTX_ARCH < 700 || GMX_PTX_ARCH == 750);
+#    endif
 
 
     // Full or partial unroll on Ampere (and later) GPUs is beneficial given the increased L1
@@ -295,6 +308,14 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
      * sm_nextSlotPtr should always be updated to point to the "next slot",
      * that is past the last point where data has been stored.
      */
+#    ifdef NBNXM_JPACKED_SPLIT_FACTOR
+    __shared__ float4 xqibStorage[c_superClusterSize * c_clusterSize];
+    __shared__ float2 ljcpibStorage[c_superClusterSize * c_clusterSize];
+    __shared__ float iForceFirstHalf[c_superClusterSize * c_clusterSize * NBNXM_FORCE_COMPONENT_COUNT];
+    float4* xqib   = xqibStorage;
+    float2* ljcpib = ljcpibStorage;
+    int*    cjs    = nullptr;
+#    else
     // NOLINTNEXTLINE(readability-redundant-declaration)
     extern __shared__ char sm_dynamicShmem[];
     char*                  sm_nextSlotPtr = sm_dynamicShmem;
@@ -312,15 +333,16 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
         sm_nextSlotPtr += (NTHREAD_Z * c_clusterSplitSize * c_jGroupSize * sizeof(*cjs));
     }
 
-#    ifndef LJ_COMB
+#        ifndef LJ_COMB
     /* shmem buffer for i atom-type pre-loading */
     int* atib = reinterpret_cast<int*>(sm_nextSlotPtr);
     sm_nextSlotPtr += (c_superClusterSize * c_clusterSize * sizeof(*atib));
-#    else
+#        else
     /* shmem buffer for i-atom LJ combination rule parameters */
     float2* ljcpib = reinterpret_cast<float2*>(sm_nextSlotPtr);
     sm_nextSlotPtr += (c_superClusterSize * c_clusterSize * sizeof(*ljcpib));
-#    endif
+#        endif
+#    endif /* NBNXM_JPACKED_SPLIT_FACTOR */
     /*********************************************************************/
 
     nb_sci         = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
@@ -424,10 +446,15 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
 #    endif
 
     /* loop over the j clusters = seen by any of the atoms in the current super-cluster;
-     * The loop stride NTHREAD_Z ensures that consecutive warps-pairs are assigned
-     * consecutive jPacked's entries.
+     * The split-J specialization assigns every fourth packed-J entry to an
+     * independent CTA. The regular kernel uses NTHREAD_Z warp-pairs per CTA.
      */
-    for (jPacked = cijPackedBegin + tidxz; jPacked < cijPackedEnd; jPacked += NTHREAD_Z)
+    for (jPacked = cijPackedBegin + jPackedPart; jPacked < cijPackedEnd;
+#    ifdef NBNXM_JPACKED_SPLIT_FACTOR
+         jPacked += NBNXM_JPACKED_SPLIT_FACTOR)
+#    else
+         jPacked += NTHREAD_Z)
+#    endif
     {
         wexcl_idx = pl_cjPacked[jPacked].imei[widx].excl_ind;
         imask     = pl_cjPacked[jPacked].imei[widx].imask;
@@ -638,7 +665,7 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
 #    ifdef EL_RF
                                 F_invr += qi * qj_f * (int_bit * inv_r2 * inv_r - two_k_rf);
 #    endif
-#    if defined EL_EWALD_ANA
+#    if defined   EL_EWALD_ANA
                                 F_invr += qi * qj_f
                                           * (int_bit * inv_r2 * inv_r + pmeCorrF(beta2 * r2) * beta3);
 #    elif defined EL_EWALD_TAB
@@ -703,11 +730,42 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
     float fshift_buf = 0.0F;
 
     /* reduce i forces */
+#    ifdef NBNXM_JPACKED_SPLIT_FACTOR
+    const int forceComponent = tidxj & 3;
+    for (i = 0; i < c_superClusterSize; i++)
+    {
+        const float reducedForce = reduce_force_i_warp_shfl_value(fci_buf[i], tidxj, c_fullWarpMask);
+        fci_buf[i].x = reducedForce;
+        if (tidxj < c_splitClSize && forceComponent < NBNXM_FORCE_COMPONENT_COUNT)
+        {
+            const int localAtom = i * c_clusterSize + tidxi;
+            iForceFirstHalf[localAtom * NBNXM_FORCE_COMPONENT_COUNT + forceComponent] = reducedForce;
+        }
+    }
+    __syncthreads();
+
+    if (tidxj >= c_splitClSize && forceComponent < NBNXM_FORCE_COMPONENT_COUNT)
+    {
+        for (i = 0; i < c_superClusterSize; i++)
+        {
+            const int localAtom = i * c_clusterSize + tidxi;
+            ai                  = sci * c_superClusterSize * c_clusterSize + localAtom;
+            const float reducedForce =
+                    fci_buf[i].x + iForceFirstHalf[localAtom * NBNXM_FORCE_COMPONENT_COUNT + forceComponent];
+            atomicAdd(&f[ai].x + forceComponent, reducedForce);
+            if (bCalcFshift)
+            {
+                fshift_buf += reducedForce;
+            }
+        }
+    }
+#    else
     for (i = 0; i < c_superClusterSize; i++)
     {
         ai = (sci * c_superClusterSize + i) * c_clusterSize + tidxi;
         reduce_force_i_warp_shfl(fci_buf[i], f, &fshift_buf, bCalcFshift, tidxj, ai, c_fullWarpMask);
     }
+#    endif
 
     /* add up local shift forces into global mem, tidxj indexes x,y,z */
     if (bCalcFshift && (tidxj & 3) < 3)
@@ -749,6 +807,7 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
 #undef NTHREAD_Z
 #undef MIN_BLOCKS_PER_MP
 #undef THREADS_PER_BLOCK
+#undef NBNXM_FORCE_COMPONENT_COUNT
 
 #undef EL_EWALD_ANY
 #undef EXCLUSION_FORCES

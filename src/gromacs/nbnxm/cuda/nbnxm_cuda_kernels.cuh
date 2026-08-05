@@ -161,6 +161,19 @@
 #include "nbnxm_cuda_kernel.cuh"
 #undef LJ_COMB_GEOM
 #undef NB_KERNEL_FUNC_NAME
+
+/* Force-only specialization matching the successful Kernel Factory four-CTA
+ * packed-J decomposition. Keep the regular symbol available for energy and
+ * pruning kernels. */
+#if !defined(CALC_ENERGIES) && !defined(PRUNE_NBL)
+#    define LJ_COMB_GEOM
+#    define NBNXM_JPACKED_SPLIT_FACTOR 4
+#    define NB_KERNEL_FUNC_NAME(x, ...) x##_ElecEw_VdwLJCombGeom_F_splitJ4_cuda
+#    include "nbnxm_cuda_kernel.cuh"
+#    undef NB_KERNEL_FUNC_NAME
+#    undef NBNXM_JPACKED_SPLIT_FACTOR
+#    undef LJ_COMB_GEOM
+#endif
 /* cut-off + V shift LJ w LB combination rules */
 #define LJ_COMB_LB
 #define NB_KERNEL_FUNC_NAME(x, ...) x##_ElecEw_VdwLJCombLB##__VA_ARGS__
