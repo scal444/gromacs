@@ -557,8 +557,6 @@ static __forceinline__ __device__ void reduce_force_i_warp_shfl(float3          
 static __forceinline__ __device__ void reduce_force_i_warp_shfl_to_shared(
         float3             fin,
         float*             sm_iForce,
-        float*             fshiftBuffer,
-        bool               calculateFshift,
         int                warpIndex,
         int                iAtomInSuperCluster,
         int                tidxj,
@@ -586,10 +584,6 @@ static __forceinline__ __device__ void reduce_force_i_warp_shfl_to_shared(
         constexpr int c_numIAtoms = c_superClusterSize * c_clusterSize;
         const int     dimension   = tidxj & 3;
         sm_iForce[(warpIndex * c_numIAtoms + iAtomInSuperCluster) * 3 + dimension] = fin.x;
-        if (calculateFshift)
-        {
-            *fshiftBuffer += fin.x;
-        }
     }
 }
 

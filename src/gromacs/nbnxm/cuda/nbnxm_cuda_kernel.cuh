@@ -707,14 +707,12 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
         bCalcFshift = false;
     }
 
-    float fshift_buf = 0.0F;
-
     /* Reduce i forces within each warp and stage the results in shared memory. */
     for (i = 0; i < c_superClusterSize; i++)
     {
         const int iAtomInSuperCluster = i * c_clusterSize + tidxi;
         reduce_force_i_warp_shfl_to_shared(
-                fci_buf[i], sm_iForce, &fshift_buf, bCalcFshift, widx, iAtomInSuperCluster, tidxj, c_fullWarpMask);
+                fci_buf[i], sm_iForce, widx, iAtomInSuperCluster, tidxj, c_fullWarpMask);
     }
     __syncthreads();
 
@@ -727,11 +725,30 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
     iForce.z = sm_iForce[forceBufferIndex + 2] + sm_iForce[c_numIAtoms * 3 + forceBufferIndex + 2];
     atomicAdd(&f[ai], iForce);
 
-    /* Preserve the existing shift-force accumulation pattern in this first isolated variant. */
-    if (bCalcFshift && (tidxj & 3) < 3)
+    /* Reduce all i forces in the block to one global shift-force update per dimension. */
+    if (bCalcFshift)
     {
-        float3* fShift = asFloat3(atdat.fShift);
-        atomicAdd(&(fShift[nb_sci.shift].x) + (tidxj & 3), fshift_buf);
+        for (int offset = warp_size / 2; offset > 0; offset >>= 1)
+        {
+            iForce.x += __shfl_down_sync(c_fullWarpMask, iForce.x, offset);
+            iForce.y += __shfl_down_sync(c_fullWarpMask, iForce.y, offset);
+            iForce.z += __shfl_down_sync(c_fullWarpMask, iForce.z, offset);
+        }
+
+        __syncthreads();
+        if ((tidx & (warp_size - 1)) == 0)
+        {
+            sm_iForce[widx * 3]     = iForce.x;
+            sm_iForce[widx * 3 + 1] = iForce.y;
+            sm_iForce[widx * 3 + 2] = iForce.z;
+        }
+        __syncthreads();
+
+        if (tidx < 3)
+        {
+            float3* fShift = asFloat3(atdat.fShift);
+            atomicAdd(&(fShift[nb_sci.shift].x) + tidx, sm_iForce[tidx] + sm_iForce[3 + tidx]);
+        }
     }
 
 #    ifdef CALC_ENERGIES
