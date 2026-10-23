@@ -321,6 +321,13 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
     float2* ljcpib = reinterpret_cast<float2*>(sm_nextSlotPtr);
     sm_nextSlotPtr += (c_superClusterSize * c_clusterSize * sizeof(*ljcpib));
 #    endif
+
+    /* One i-force contribution per warp. These are combined at the end of the kernel to halve
+     * the number of global force atomics. */
+    constexpr int c_numWarps  = THREADS_PER_BLOCK / warp_size;
+    constexpr int c_numIAtoms = c_superClusterSize * c_clusterSize;
+    float*        sm_iForce   = reinterpret_cast<float*>(sm_nextSlotPtr);
+    sm_nextSlotPtr += c_numWarps * c_numIAtoms * 3 * sizeof(*sm_iForce);
     /*********************************************************************/
 
     nb_sci         = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
@@ -702,14 +709,25 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
 
     float fshift_buf = 0.0F;
 
-    /* reduce i forces */
+    /* Reduce i forces within each warp and stage the results in shared memory. */
     for (i = 0; i < c_superClusterSize; i++)
     {
-        ai = (sci * c_superClusterSize + i) * c_clusterSize + tidxi;
-        reduce_force_i_warp_shfl(fci_buf[i], f, &fshift_buf, bCalcFshift, tidxj, ai, c_fullWarpMask);
+        const int iAtomInSuperCluster = i * c_clusterSize + tidxi;
+        reduce_force_i_warp_shfl_to_shared(
+                fci_buf[i], sm_iForce, &fshift_buf, bCalcFshift, widx, iAtomInSuperCluster, tidxj, c_fullWarpMask);
     }
+    __syncthreads();
 
-    /* add up local shift forces into global mem, tidxj indexes x,y,z */
+    /* Each thread owns one i atom here and combines the two warp contributions. */
+    ai                         = sci * c_numIAtoms + tidx;
+    const int forceBufferIndex = tidx * 3;
+    float3    iForce;
+    iForce.x = sm_iForce[forceBufferIndex] + sm_iForce[c_numIAtoms * 3 + forceBufferIndex];
+    iForce.y = sm_iForce[forceBufferIndex + 1] + sm_iForce[c_numIAtoms * 3 + forceBufferIndex + 1];
+    iForce.z = sm_iForce[forceBufferIndex + 2] + sm_iForce[c_numIAtoms * 3 + forceBufferIndex + 2];
+    atomicAdd(&f[ai], iForce);
+
+    /* Preserve the existing shift-force accumulation pattern in this first isolated variant. */
     if (bCalcFshift && (tidxj & 3) < 3)
     {
         float3* fShift = asFloat3(atdat.fShift);

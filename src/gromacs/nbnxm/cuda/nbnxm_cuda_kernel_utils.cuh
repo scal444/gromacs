@@ -549,6 +549,50 @@ static __forceinline__ __device__ void reduce_force_i_warp_shfl(float3          
     }
 }
 
+/*! Final i-force reduction within a warp, storing one contribution per warp in shared memory.
+ *
+ * The caller combines the two warp contributions before updating global memory. The shared-memory
+ * layout is [warp][i-atom][dimension].
+ */
+static __forceinline__ __device__ void reduce_force_i_warp_shfl_to_shared(
+        float3             fin,
+        float*             sm_iForce,
+        float*             fshiftBuffer,
+        bool               calculateFshift,
+        int                warpIndex,
+        int                iAtomInSuperCluster,
+        int                tidxj,
+        const unsigned int activemask)
+{
+    fin.x += __shfl_down_sync(activemask, fin.x, c_clusterSize);
+    fin.y += __shfl_up_sync(activemask, fin.y, c_clusterSize);
+    fin.z += __shfl_down_sync(activemask, fin.z, c_clusterSize);
+
+    if (tidxj & 1)
+    {
+        fin.x = fin.y;
+    }
+
+    fin.x += __shfl_down_sync(activemask, fin.x, 2 * c_clusterSize);
+    fin.z += __shfl_up_sync(activemask, fin.z, 2 * c_clusterSize);
+
+    if (tidxj & 2)
+    {
+        fin.x = fin.z;
+    }
+
+    if ((tidxj & 3) < 3)
+    {
+        constexpr int c_numIAtoms = c_superClusterSize * c_clusterSize;
+        const int     dimension   = tidxj & 3;
+        sm_iForce[(warpIndex * c_numIAtoms + iAtomInSuperCluster) * 3 + dimension] = fin.x;
+        if (calculateFshift)
+        {
+            *fshiftBuffer += fin.x;
+        }
+    }
+}
+
 /*! Energy reduction; this implementation works only with power of two
  *  array sizes.
  */

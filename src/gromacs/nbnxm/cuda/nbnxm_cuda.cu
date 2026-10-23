@@ -465,6 +465,8 @@ static inline int calc_shmem_required_nonbonded(const int                       
         /* i-atom types in shared memory */
         shmem += c_superClusterSize * c_clusterSize * sizeof(int);
     }
+    /* one force contribution per warp, i atom, and spatial dimension */
+    shmem += 2 * c_superClusterSize * c_clusterSize * 3 * sizeof(float);
     /* for reducing prunedPairListCount over all warps in the block, to be used in plist sorting */
     shmem += 1 * sizeof(int);
 
