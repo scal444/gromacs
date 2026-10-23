@@ -92,17 +92,18 @@ __global__ void bonded_kernel_gpu(BondedGpuKernelParameters kernelParams,
 
     extern __shared__ char sm_dynamicShmem[];
     char*                  sm_nextSlotPtr = sm_dynamicShmem;
-    float3*                sm_fShiftLoc   = reinterpret_cast<float3*>(sm_nextSlotPtr);
-    sm_nextSlotPtr += c_numShiftVectors * sizeof(float3);
+    DeviceShiftAccumulator* sm_fShiftLoc = reinterpret_cast<DeviceShiftAccumulator*>(sm_nextSlotPtr);
+    sm_nextSlotPtr += c_numShiftVectors * sizeof(DeviceShiftAccumulator);
 
     static_assert(sizeof(DeviceFloat4) == sizeof(float4));
+    static_assert(sizeof(DeviceShiftAccumulator) == 2 * sizeof(float3));
     DeviceFloat4* gm_xq = reinterpret_cast<DeviceFloat4*>(gm_xq_in);
 
     if (calcVir)
     {
         if (threadIdx.x < c_numShiftVectors)
         {
-            sm_fShiftLoc[threadIdx.x] = make_float3(0.0F, 0.0F, 0.0F);
+            sm_fShiftLoc[threadIdx.x] = {};
         }
         __syncthreads();
     }
@@ -253,7 +254,8 @@ __global__ void bonded_kernel_gpu(BondedGpuKernelParameters kernelParams,
         __syncthreads();
         if (threadIdx.x < c_numShiftVectors)
         {
-            staggeredAtomicAddForce(gm_fShift, sm_fShiftLoc[threadIdx.x], threadIdx.x, threadIdx.x);
+            staggeredAtomicAddForce(
+                    gm_fShift, listedFShiftLoad(sm_fShiftLoc[threadIdx.x]), threadIdx.x, threadIdx.x);
         }
     }
 }

@@ -77,6 +77,82 @@
 namespace gmx
 {
 
+#    if GMX_GPU_CUDA
+/*! \brief Signed 64-bit fixed-point vector stored as pairs of 32-bit words.
+ *
+ * This representation lets shared-memory accumulation use native 32-bit
+ * integer atomics. CUDA implements shared-memory floating-point atomics and
+ * 64-bit integer atomics with compare-and-swap loops on supported hardware.
+ */
+struct ListedFShiftSplitInt64
+{
+    uint2 x;
+    uint2 y;
+    uint2 z;
+};
+
+// Resolution is 2^-20; the signed 64-bit input and accumulated-value range is
+// [-2^43, 2^43) in force units.
+static constexpr float c_listedFShiftScale        = 0x1p20F;
+static constexpr float c_listedFShiftInverseScale = 0x1p-20F;
+
+/*! \brief Atomically add a signed 64-bit increment using two 32-bit additions.
+ *
+ * Each addition is modulo 2^32. The carry from the low word is added to the
+ * high word. Since all increments and carries commute, the final value after
+ * block synchronization is independent of the order of the atomic operations.
+ */
+__forceinline__ __device__ void atomicAddSplitInt64(uint2* target, const long long increment)
+{
+    const unsigned long long incrementBits = static_cast<unsigned long long>(increment);
+    const unsigned int       incrementLow  = static_cast<unsigned int>(incrementBits);
+    const unsigned int       incrementHigh = static_cast<unsigned int>(incrementBits >> 32);
+    const unsigned int       oldLow        = atomicAdd(&target->x, incrementLow);
+    const unsigned int       carry         = (oldLow + incrementLow < oldLow) ? 1U : 0U;
+    atomicAdd(&target->y, incrementHigh + carry);
+}
+
+__forceinline__ __device__ long long listedFShiftToFixed64(const float value)
+{
+    // 2^43 is the input range limit with the 2^20 scale. The accumulated
+    // fixed-point value must also remain in the signed 64-bit range.
+    GMX_DEVICE_ASSERT(isfinite(value) && value >= -0x1p43F && value < 0x1p43F);
+    return __float2ll_rn(value * c_listedFShiftScale);
+}
+
+__forceinline__ __device__ void atomicFetchAddLocal(ListedFShiftSplitInt64* __restrict__ targetPtr,
+                                                    const int index,
+                                                    float3    input)
+{
+    atomicAddSplitInt64(&targetPtr[index].x, listedFShiftToFixed64(input.x));
+    atomicAddSplitInt64(&targetPtr[index].y, listedFShiftToFixed64(input.y));
+    atomicAddSplitInt64(&targetPtr[index].z, listedFShiftToFixed64(input.z));
+}
+
+__forceinline__ __device__ long long loadSplitInt64(const uint2 value)
+{
+    const long long signedHigh = static_cast<long long>(value.y & 0x7fffffffU)
+                                 - ((value.y & 0x80000000U) != 0 ? (1LL << 31) : 0);
+    return signedHigh * (1LL << 32) + value.x;
+}
+
+__forceinline__ __device__ float3 listedFShiftLoad(const ListedFShiftSplitInt64& value)
+{
+    return make_float3(loadSplitInt64(value.x) * c_listedFShiftInverseScale,
+                       loadSplitInt64(value.y) * c_listedFShiftInverseScale,
+                       loadSplitInt64(value.z) * c_listedFShiftInverseScale);
+}
+
+using DeviceShiftAccumulator = ListedFShiftSplitInt64;
+#    else
+using DeviceShiftAccumulator = DeviceFloat3;
+
+GMX_DEVICE_FUNC_ATTRIBUTE static inline DeviceFloat3 listedFShiftLoad(const DeviceFloat3 value)
+{
+    return value;
+}
+#    endif
+
 static constexpr float c_deg2RadF = gmx::c_deg2Rad;
 constexpr float        c_Pi       = M_PI;
 
@@ -147,9 +223,9 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void bonds_gpu(const int               i
                                                        const DeviceGlobalPtr<const t_iparams> gm_forceparams,
                                                        const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                        DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                       DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                       const PbcAiuc&                pbcAiuc,
-                                                       const int                     localId)
+                                                       DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                       const PbcAiuc& pbcAiuc,
+                                                       const int      localId)
 {
     const int type = gm_forceatoms[3 * i];
     const int ai   = gm_forceatoms[3 * i + 1];
@@ -216,9 +292,9 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void angles_gpu(const int               
                                                         const DeviceGlobalPtr<const t_iparams> gm_forceparams,
                                                         const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                         DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                        DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                        const PbcAiuc&                pbcAiuc,
-                                                        const int                     localId)
+                                                        DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                        const PbcAiuc& pbcAiuc,
+                                                        const int      localId)
 {
     DeviceInt4 angleData = loadInt4(gm_forceatoms, i);
     const int  type      = angleData[0];
@@ -284,7 +360,7 @@ urey_bradley_gpu(const int                                 i,
                  const DeviceGlobalPtr<const t_iparams>    gm_forceparams,
                  const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                  DeviceGlobalPtr<DeviceFloat3>             gm_f,
-                 DeviceLocalPtr<DeviceFloat3>              sm_fShiftLoc,
+                 DeviceLocalPtr<DeviceShiftAccumulator>    sm_fShiftLoc,
                  const PbcAiuc&                            pbcAiuc,
                  const int                                 localId)
 {
@@ -487,7 +563,7 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void do_dih_fup_gpu(const int           
                                                             const DeviceFloat3            m,
                                                             const DeviceFloat3            n,
                                                             DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                            DeviceLocalPtr<DeviceFloat3> sm_fShiftLoc,
+                                                            DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
                                                             const PbcAiuc& pbcAiuc,
                                                             const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                             const int t1,
@@ -542,9 +618,9 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void pdihs_gpu(const int               i
                                                        const DeviceGlobalPtr<const t_iparams> gm_forceparams,
                                                        const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                        DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                       DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                       const PbcAiuc&                pbcAiuc,
-                                                       const int                     localId)
+                                                       DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                       const PbcAiuc& pbcAiuc,
+                                                       const int      localId)
 {
     int type = gm_forceatoms[5 * i];
     int ai   = gm_forceatoms[5 * i + 1];
@@ -588,9 +664,9 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void rbdihs_gpu(const int               
                                                         const DeviceGlobalPtr<const t_iparams> gm_forceparams,
                                                         const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                         DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                        DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                        const PbcAiuc&                pbcAiuc,
-                                                        const int                     localId)
+                                                        DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                        const PbcAiuc& pbcAiuc,
+                                                        const int      localId)
 {
     constexpr float c0 = 0.0F, c1 = 1.0F, c2 = 2.0F, c3 = 3.0F, c4 = 4.0F, c5 = 5.0F;
 
@@ -701,9 +777,9 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void idihs_gpu(const int               i
                                                        const DeviceGlobalPtr<const t_iparams> gm_forceparams,
                                                        const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                        DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                       DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                       const PbcAiuc&                pbcAiuc,
-                                                       const int                     localId)
+                                                       DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                       const PbcAiuc& pbcAiuc,
+                                                       const int      localId)
 {
     int type = gm_forceatoms[5 * i];
     int ai   = gm_forceatoms[5 * i + 1];
@@ -753,12 +829,12 @@ GMX_DEVICE_FUNC_ATTRIBUTE static inline void pairs_gpu(const int i,
                                                        const DeviceGlobalPtr<const t_iparams> gm_iparams,
                                                        const DeviceGlobalPtr<const DeviceFloat4> gm_xq,
                                                        DeviceGlobalPtr<DeviceFloat3> gm_f,
-                                                       DeviceLocalPtr<DeviceFloat3>  sm_fShiftLoc,
-                                                       const PbcAiuc&                pbcAiuc,
-                                                       const float                   scale_factor,
-                                                       DevicePrivatePtr<float>       vtot_loc,
-                                                       DevicePrivatePtr<float>       vtotElec_loc,
-                                                       const int                     localId)
+                                                       DeviceLocalPtr<DeviceShiftAccumulator> sm_fShiftLoc,
+                                                       const PbcAiuc&          pbcAiuc,
+                                                       const float             scale_factor,
+                                                       DevicePrivatePtr<float> vtot_loc,
+                                                       DevicePrivatePtr<float> vtotElec_loc,
+                                                       const int               localId)
 {
     int type = gm_forceatoms[3 * i];
     int ai   = gm_forceatoms[3 * i + 1];

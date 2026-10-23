@@ -155,9 +155,14 @@ ListedForcesGpu::Impl::Impl(const gmx_ffparams_t& ffparams,
     kernelLaunchConfig_.blockSize[1] = 1;
     kernelLaunchConfig_.blockSize[2] = 1;
     kernelLaunchConfig_.gridSize[0] = (fTypeRangeEnd + c_threadsBondedPerBlock) / c_threadsBondedPerBlock;
-    kernelLaunchConfig_.gridSize[1]      = 1;
-    kernelLaunchConfig_.gridSize[2]      = 1;
+    kernelLaunchConfig_.gridSize[1] = 1;
+    kernelLaunchConfig_.gridSize[2] = 1;
+#if GMX_GPU_CUDA
+    // CUDA accumulates the three components as pairs of 32-bit integer words.
+    kernelLaunchConfig_.sharedMemorySize = c_numShiftVectors * 2 * sizeof(Float3);
+#else
     kernelLaunchConfig_.sharedMemorySize = c_numShiftVectors * sizeof(Float3);
+#endif
 }
 
 ListedForcesGpu::Impl::~Impl()
