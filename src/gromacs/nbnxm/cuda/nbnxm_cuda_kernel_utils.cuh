@@ -647,6 +647,27 @@ reduce_energy_warp_shfl(float E_lj, float E_el, float* e_lj, float* e_el, int ti
     }
 }
 
+/*! Energy reduction within a warp, storing one pair of contributions per warp. */
+static __forceinline__ __device__ void reduce_energy_warp_shfl_to_shared(
+        float E_lj, float E_el, float* sm_energy, int tidx, const unsigned int activemask)
+{
+    int sh = 1;
+#    pragma unroll 5
+    for (int i = 0; i < 5; i++)
+    {
+        E_lj += __shfl_down_sync(activemask, E_lj, sh);
+        E_el += __shfl_down_sync(activemask, E_el, sh);
+        sh += sh;
+    }
+
+    if ((tidx & (warp_size - 1)) == 0)
+    {
+        const int warpIndex             = tidx / warp_size;
+        sm_energy[warpIndex * 2]     = E_lj;
+        sm_energy[warpIndex * 2 + 1] = E_el;
+    }
+}
+
 /*! Final i-force reduction for fep gpu kernel; this implementation works only with power of two
  *  array sizes.
  */

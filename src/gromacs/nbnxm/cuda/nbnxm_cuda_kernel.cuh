@@ -752,8 +752,15 @@ __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP)
     }
 
 #    ifdef CALC_ENERGIES
-    /* reduce the energies over warps and store into global memory */
-    reduce_energy_warp_shfl(E_lj, E_el, e_lj, e_el, tidx, c_fullWarpMask);
+    /* Reduce energy within each warp, then combine both warps before updating global memory. */
+    __syncthreads();
+    reduce_energy_warp_shfl_to_shared(E_lj, E_el, sm_iForce, tidx, c_fullWarpMask);
+    __syncthreads();
+    if (tidx < 2)
+    {
+        float* energyOutput = (tidx == 0) ? e_lj : e_el;
+        atomicAdd(energyOutput, sm_iForce[tidx] + sm_iForce[2 + tidx]);
+    }
 #    endif
 
 
