@@ -95,7 +95,8 @@ public:
     void writeOutput() override;
 
 private:
-    SelectionList sel_;
+    SelectionList        sel_;
+    SelectionOptionInfo* selInfo_;
 
     std::string         fnX_;
     std::string         fnV_;
@@ -108,7 +109,7 @@ private:
     AnalysisData fdata_;
 };
 
-Trajectory::Trajectory() : dimMask_{ true, true, true, false }, maskSet_{}
+Trajectory::Trajectory() : selInfo_(nullptr), dimMask_{ true, true, true, false }, maskSet_{}
 {
     registerAnalysisDataset(&xdata_, "x");
     registerAnalysisDataset(&vdata_, "v");
@@ -150,7 +151,7 @@ void Trajectory::initOptions(IOptionsContainer* options, TrajectoryAnalysisSetti
                                .defaultBasename("force")
                                .description("Forces for each position as a function of time"));
 
-    options->addOption(
+    selInfo_ = options->addOption(
             SelectionOption("select").storeVector(&sel_).required().dynamicMask().multiValue().description(
                     "Selections to analyze"));
 
@@ -177,6 +178,10 @@ void Trajectory::optionsFinished(TrajectoryAnalysisSettings* settings)
         frameFlags |= TRX_READ_F;
     }
     settings->setFrameFlags(frameFlags);
+    // Velocities and forces need to be requested before the selections are
+    // compiled, which happens before initAnalysis().
+    selInfo_->setEvaluateVelocities(!fnV_.empty());
+    selInfo_->setEvaluateForces(!fnF_.empty());
     if (std::count(std::begin(maskSet_), std::end(maskSet_), true) > 0)
     {
         for (int i = 0; i <= DIM; ++i)
@@ -212,7 +217,6 @@ void Trajectory::initAnalysis(const TrajectoryAnalysisSettings& settings, const 
         vdata_.setDataSetCount(sel_.size());
         for (size_t g = 0; g < sel_.size(); ++g)
         {
-            sel_[g].setEvaluateVelocities(true);
             vdata_.setColumnCount(g, 3 * sel_[g].posCount());
         }
         AnalysisDataVectorPlotModulePointer plot(new AnalysisDataVectorPlotModule(settings.plotSettings()));
@@ -228,7 +232,6 @@ void Trajectory::initAnalysis(const TrajectoryAnalysisSettings& settings, const 
         fdata_.setDataSetCount(sel_.size());
         for (size_t g = 0; g < sel_.size(); ++g)
         {
-            sel_[g].setEvaluateForces(true);
             fdata_.setColumnCount(g, 3 * sel_[g].posCount());
         }
         AnalysisDataVectorPlotModulePointer plot(new AnalysisDataVectorPlotModule(settings.plotSettings()));

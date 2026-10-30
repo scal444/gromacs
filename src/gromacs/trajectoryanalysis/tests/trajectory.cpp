@@ -95,6 +95,20 @@ TEST_F(TrajectoryModuleTest, PlotsXOnly)
     runTest(CommandLine(cmdline));
 }
 
+TEST_F(TrajectoryModuleTest, WritesCoordinatesVelocitiesAndForces)
+{
+    const char* const cmdline[] = { "trajectory", "-select", "resnr 1", "resnr 2" };
+    setTopology("clustsize.tpr");
+    setTrajectory("extract_cluster.trr");
+    setOutputFile("-ox", "coord.xvg", NoTextMatch());
+    setOutputFile("-ov", "vel.xvg", NoTextMatch());
+    setOutputFile("-of", "force.xvg", NoTextMatch());
+    includeDataset("x");
+    includeDataset("v");
+    includeDataset("f");
+    runTest(CommandLine(cmdline));
+}
+
 TEST_F(TrajectoryModuleTest, HandlesNoVelocities)
 {
     const char* const cmdline[] = {
