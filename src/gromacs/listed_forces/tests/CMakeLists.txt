@@ -34,6 +34,7 @@
 gmx_add_unit_test(ListedForcesTest listed_forces-test HARDWARE_DETECTION
     CPP_SOURCE_FILES
         bondedtestdata.cpp
+        listed_forces_simd.cpp
         pairs.cpp
         position_restraints.cpp
     GPU_CPP_SOURCE_FILES
@@ -42,4 +43,5 @@ gmx_add_unit_test(ListedForcesTest listed_forces-test HARDWARE_DETECTION
 target_link_libraries(listed_forces-test PRIVATE
         math
         pbcutil
+        topology
         )

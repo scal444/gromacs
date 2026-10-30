@@ -361,20 +361,30 @@ protected:
 
         if (!input_.fep || lambda == 0)
         {
-            fr->use_simd_kernels = true;
             flavors.push_back(BondedKernelFlavor::ForcesSimdWhenAvailable);
+            flavors.push_back(BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable);
+            flavors.push_back(BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable);
         }
+
+        // The shift-force virial contribution of the first (plain-C virial) flavor
+        matrix referenceShiftVirial;
+        clear_mat(referenceShiftVirial);
+        std::vector<RVec> shiftVectors(c_numShiftVectors);
+        calc_shifts(box_, shiftVectors);
 
         for (const auto flavor : flavors)
         {
             SCOPED_TRACE("Testing bonded kernel flavor: " + c_bondedKernelFlavorStrings[flavor]);
+
+            // do_pairs() selects SIMD kernels based on the step workload and this setting
+            fr->use_simd_kernels = useSimdWhenAvailable(flavor);
 
             StepWorkload stepWork;
             stepWork.computeVirial = computeVirial(flavor);
             stepWork.computeEnergy = computeEnergy(flavor);
 
             bool havePerturbedInteractions = input_.fep;
-            if (flavor == BondedKernelFlavor::ForcesSimdWhenAvailable)
+            if (useSimdWhenAvailable(flavor))
             {
                 havePerturbedInteractions = false;
             }
@@ -398,7 +408,7 @@ protected:
                      mdatoms.chargeB,
                      makeArrayRef(mdatoms.bPerturbed),
                      mdatoms.cENER,
-                     mdatoms.nPerturbed,
+                     1, // All atoms are in energy group 0
                      *fr,
                      havePerturbedInteractions,
                      stepWork,
@@ -410,7 +420,41 @@ protected:
 
             if (computeVirial(flavor))
             {
-                shiftForcesChecker.checkVector(output.fShift[gmx::c_centralShiftIndex], "Central");
+                matrix shiftVirial;
+                clear_mat(shiftVirial);
+                for (int s = 0; s < c_numShiftVectors; s++)
+                {
+                    for (int d1 = 0; d1 < DIM; d1++)
+                    {
+                        for (int d2 = 0; d2 < DIM; d2++)
+                        {
+                            shiftVirial[d1][d2] -= 0.5 * shiftVectors[s][d1] * output.fShift[s][d2];
+                        }
+                    }
+                }
+                if (!useSimdWhenAvailable(flavor))
+                {
+                    copy_mat(shiftVirial, referenceShiftVirial);
+                    shiftForcesChecker.checkVector(output.fShift[gmx::c_centralShiftIndex],
+                                                   "Central");
+                }
+                else
+                {
+                    // The SIMD kernels distribute the shift forces differently over
+                    // the shift vectors, so we compare the virial contribution instead.
+                    shiftForcesChecker.disableUnusedEntriesCheck();
+                    for (int d1 = 0; d1 < DIM; d1++)
+                    {
+                        for (int d2 = 0; d2 < DIM; d2++)
+                        {
+                            EXPECT_REAL_EQ_TOL(referenceShiftVirial[d1][d2],
+                                               shiftVirial[d1][d2],
+                                               relativeToleranceAsPrecisionDependentFloatingPoint(
+                                                       1.0, input_.floatToler, input_.doubleToler))
+                                    << "shift virial component " << d1 << " " << d2;
+                        }
+                    }
+                }
             }
             else
             {

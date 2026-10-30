@@ -307,7 +307,9 @@ auto formatPbcType = [](PbcType pbc)
 auto formatFlavor = [](BondedKernelFlavor flavor)
 {
     static constexpr gmx::EnumerationArray<BondedKernelFlavor, const char*> flavorNames = {
-        "ForcesSimdWhenAvailable", "ForcesNoSimd", "ForcesAndVirialAndEnergy", "ForcesAndEnergy"
+        "ForcesSimdWhenAvailable",          "ForcesNoSimd",
+        "ForcesAndVirialAndEnergy",         "ForcesAndEnergy",
+        "ForcesAndEnergySimdWhenAvailable", "ForcesAndVirialAndEnergySimdWhenAvailable"
     };
     return flavorNames[flavor];
 };
@@ -448,8 +450,8 @@ protected:
 
         // CPU + GPU shared skip conditions
         skipReasons.appendIf(!isFep && lambda_ != 0.0, "Non-FEP inputs only support lambda=0.0");
-        skipReasons.appendIf(isFep && flavor_ == BondedKernelFlavor::ForcesSimdWhenAvailable,
-                             "FEP does not support ForcesSimdWhenAvailable flavor");
+        skipReasons.appendIf(isFep && useSimdWhenAvailable(flavor_),
+                             "FEP does not support SimdWhenAvailable flavors");
 
         // GPU-specific skip conditions
         if (isGpu)
@@ -471,7 +473,7 @@ protected:
         // CPU-specific skip conditions
         else
         {
-            skipReasons.appendIf(flavor_ == BondedKernelFlavor::ForcesSimdWhenAvailable && lambda_ != 0.0,
+            skipReasons.appendIf(useSimdWhenAvailable(flavor_) && lambda_ != 0.0,
                                  formatString("CPU does not support %s with lambda=%.1f",
                                               c_bondedKernelFlavorStrings[flavor_].c_str(),
                                               lambda_));
@@ -620,8 +622,12 @@ std::vector<PaddedVector<RVec>> c_coordinatesForTestsZeroAngle = {
 std::vector<PbcType> c_pbcForTests = { PbcType::No, PbcType::XY, PbcType::Xyz };
 
 //! Bonded kernel flavors for testing
-std::vector<BondedKernelFlavor> c_flavorsForTests = { BondedKernelFlavor::ForcesAndVirialAndEnergy,
-                                                      BondedKernelFlavor::ForcesSimdWhenAvailable };
+std::vector<BondedKernelFlavor> c_flavorsForTests = {
+    BondedKernelFlavor::ForcesAndVirialAndEnergy,
+    BondedKernelFlavor::ForcesSimdWhenAvailable,
+    BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable,
+    BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable
+};
 
 //! Lambda values for testing
 std::vector<real> c_lambdaValuesForTests = { 0.0, 0.5, 1.0 };
