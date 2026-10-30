@@ -145,8 +145,15 @@ public:
                 reinterpret_cast<ForceBufferElementType*>(forceBuffer_.data() + forceBuffer_.size()));
     }
 
-    //! Returns a view of the shift force buffer
-    ArrayRef<RVec> shiftForces() { return shiftForces_; }
+    //! Returns a view of the shift force buffer, size c_numShiftVectors
+    ArrayRef<RVec> shiftForces();
+
+    /*! \brief Returns a view with padding of the shift force buffer
+     *
+     * There is padding of one element to allow 4-wide SIMD loads and stores,
+     * as used by transposeScatterIncrU<3>() in the free-energy kernel.
+     */
+    ArrayRefWithPadding<RVec> shiftForcesWithPadding();
 
     //! Returns a reference to the diagonal virial
     gmx::RVec& diagonalVirial() { return diagonalVirial_; }
@@ -175,7 +182,7 @@ private:
     //! The number of atoms in the buffer
     int numAtoms_ = 0;
 
-    //! Shift force array, size c_numShiftVectors
+    //! Shift force array, size c_numShiftVectors plus one element of padding
     std::vector<RVec> shiftForces_;
     //! Virial buffer for diagonal only contributions
     gmx::RVec diagonalVirial_;

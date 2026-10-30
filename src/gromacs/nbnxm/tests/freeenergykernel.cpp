@@ -127,8 +127,8 @@ struct OutputQuantities
     gmx_grppairener_t energy;
     //! Derivative with respect to lambda (size efptNR)
     std::vector<real> dvdLambda;
-    //! Shift force vectors (size N_IVEC but in this test only 1)
-    std::vector<RVec> fShift;
+    //! Shift force vectors (size N_IVEC but in this test only 1), padded for SIMD access
+    PaddedVector<RVec> fShift;
     //! Forces (size c_numAtoms)
     PaddedVector<RVec> f;
 };
@@ -496,7 +496,7 @@ protected:
                                   lambdas,
                                   &nrnb,
                                   output.f.arrayRefWithPadding(),
-                                  as_rvec_array(output.fShift.data()),
+                                  output.fShift.arrayRefWithPadding(),
                                   output.energy.energyGroupPairTerms[NonBondedEnergyTerms::CoulombSR],
                                   output.energy.energyGroupPairTerms[NonBondedEnergyTerms::LJSR],
                                   output.dvdLambda);

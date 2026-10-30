@@ -346,7 +346,7 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                   ArrayRef<const real>                   lambda,
                                   t_nrnb* gmx_restrict                   nrnb,
                                   ArrayRefWithPadding<RVec>              threadForceBuffer,
-                                  rvec gmx_unused*                       threadForceShiftBuffer,
+                                  ArrayRefWithPadding<RVec> gmx_unused   threadForceShiftBuffer,
                                   ArrayRef<real>                         threadVCoul,
                                   ArrayRef<real>                         threadVVdw,
                                   ArrayRef<real>                         threadDvdl)
@@ -528,7 +528,7 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
 
         if (doShiftForces)
         {
-            GMX_ASSERT(threadForceShiftBuffer != nullptr, "need a valid threadForceShiftBuffer");
+            GMX_ASSERT(!threadForceShiftBuffer.empty(), "need a valid threadForceShiftBuffer");
         }
     }
 
@@ -1302,7 +1302,7 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
                 if (doShiftForces)
                 {
                     transposeScatterIncrU<3>(
-                            reinterpret_cast<real*>(threadForceShiftBuffer), preloadIs, fIX, fIY, fIZ);
+                            threadForceShiftBuffer.paddedArrayRef().data()[0], preloadIs, fIX, fIY, fIZ);
                 }
             }
             if (doPotential)
@@ -1355,7 +1355,7 @@ typedef void (*KernelFunction)(const AtomPairlist&                    nlist,
                                ArrayRef<const real>                   lambda,
                                t_nrnb* gmx_restrict                   nrnb,
                                ArrayRefWithPadding<RVec>              threadForceBuffer,
-                               rvec*                                  threadForceShiftBuffer,
+                               ArrayRefWithPadding<RVec>              threadForceShiftBuffer,
                                ArrayRef<real>                         threadVCoul,
                                ArrayRef<real>                         threadVVdw,
                                ArrayRef<real>                         threadDvdl);
@@ -1504,7 +1504,7 @@ void gmx_nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                ArrayRef<const real>                   lambda,
                                t_nrnb*                                nrnb,
                                ArrayRefWithPadding<RVec>              threadForceBuffer,
-                               rvec*                                  threadForceShiftBuffer,
+                               ArrayRefWithPadding<RVec>              threadForceShiftBuffer,
                                ArrayRef<real>                         threadVCoul,
                                ArrayRef<real>                         threadVVdw,
                                ArrayRef<real>                         threadDvdl)
@@ -1519,6 +1519,10 @@ void gmx_nb_free_energy_kernel(const AtomPairlist&                    nlist,
     GMX_ASSERT(!GMX_SIMD_HAVE_REAL || threadForceBuffer.empty()
                        || threadForceBuffer.size() > threadForceBuffer.unpaddedArrayRef().ssize(),
                "We need actual padding with at least one element for SIMD scatter operations");
+    GMX_ASSERT(!GMX_SIMD_HAVE_REAL || threadForceShiftBuffer.empty()
+                       || threadForceShiftBuffer.size() > threadForceShiftBuffer.unpaddedArrayRef().ssize(),
+               "We need actual padding with at least one element for SIMD scatter operations on "
+               "the shift forces");
 
     const auto&  scParams                   = *interactionParameters.softCoreParameters;
     const bool   elecInteractionTypeIsEwald = (usingPmeOrEwald(interactionParameters.coulomb.type));

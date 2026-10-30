@@ -82,7 +82,8 @@ class StepWorkload;
  * \param[in] lambda     List of free-energy lambdas for different components
  * \param[in,out] nrnb   Flop counters to add to
  * \param[in,out] threadForceBuffer  Thread-local force buffer to accumulate into
- * \param[in,out] threadForceShiftBuffer  Thread-local shift force buffer to accumulate into
+ * \param[in,out] threadForceShiftBuffer  Thread-local shift force buffer to accumulate into,
+ *                                        needs padding of at least one element for SIMD access
  * \param[in,out] threadVc  Thread-local Coulomb energy group pair buffer to accumulate into
  * \param[in,out] threadVv  Thread-local VdW energy group pair buffer to accumulate into
  * \param[in,out] threadDvdl  Thread-local dV/dlambda component buffer to accumulate into
@@ -106,7 +107,7 @@ void gmx_nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                ArrayRef<const real>                   lambda,
                                t_nrnb* gmx_restrict                   nrnb,
                                ArrayRefWithPadding<RVec>              threadForceBuffer,
-                               rvec*                                  threadForceShiftBuffer,
+                               ArrayRefWithPadding<RVec>              threadForceShiftBuffer,
                                ArrayRef<real>                         threadVc,
                                ArrayRef<real>                         threadVv,
                                ArrayRef<real>                         threadDvdl);

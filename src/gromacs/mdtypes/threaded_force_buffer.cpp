@@ -68,8 +68,25 @@ static constexpr int s_maxNumThreadsForReduction = 256;
 template<typename ForceBufferElementType>
 ThreadForceBuffer<ForceBufferElementType>::ThreadForceBuffer(const int threadIndex,
                                                              const int numEnergyGroups) :
-    threadIndex_(threadIndex), shiftForces_(c_numShiftVectors), groupPairEnergies_(numEnergyGroups)
+    threadIndex_(threadIndex),
+    // Pad with one element to allow 4-wide SIMD loads and stores, as for the force buffer
+    shiftForces_(c_numShiftVectors + 1),
+    groupPairEnergies_(numEnergyGroups)
 {
+}
+
+template<typename ForceBufferElementType>
+ArrayRef<RVec> ThreadForceBuffer<ForceBufferElementType>::shiftForces()
+{
+    return ArrayRef<RVec>(shiftForces_.data(), shiftForces_.data() + c_numShiftVectors);
+}
+
+template<typename ForceBufferElementType>
+ArrayRefWithPadding<RVec> ThreadForceBuffer<ForceBufferElementType>::shiftForcesWithPadding()
+{
+    return ArrayRefWithPadding<RVec>(shiftForces_.data(),
+                                     shiftForces_.data() + c_numShiftVectors,
+                                     shiftForces_.data() + shiftForces_.size());
 }
 
 template<typename ForceBufferElementType>

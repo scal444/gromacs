@@ -194,7 +194,7 @@ void dispatchFreeEnergyKernel(gmx::ArrayRef<const std::unique_ptr<AtomPairlist>>
             }
 
             auto  threadForces           = threadForceBuffer.forceBufferWithPadding();
-            rvec* threadForceShiftBuffer = as_rvec_array(threadForceBuffer.shiftForces().data());
+            auto                threadForceShiftBuffer = threadForceBuffer.shiftForcesWithPadding();
             gmx::ArrayRef<real> threadVc =
                     threadForceBuffer.groupPairEnergies().energyGroupPairTerms[NonBondedEnergyTerms::CoulombSR];
             gmx::ArrayRef<real> threadVv =
@@ -285,7 +285,7 @@ void dispatchFreeEnergyKernel(gmx::ArrayRef<const std::unique_ptr<AtomPairlist>>
                                               lam_i,
                                               nrnb,
                                               gmx::ArrayRefWithPadding<gmx::RVec>{},
-                                              nullptr,
+                                              gmx::ArrayRefWithPadding<gmx::RVec>{},
                                               threadVc,
                                               threadVv,
                                               threadDvdl);
