@@ -76,6 +76,7 @@
 #include "gromacs/utility/vec.h"
 
 #include "listed_internal.h"
+#include "shift_forces_simd.h"
 
 using namespace gmx; // TODO: Remove when this file is moved into gmx namespace
 
@@ -843,17 +844,30 @@ static real do_pairs_general(InteractionFunction                 ftype,
 /*! \brief Calculate pairs, only for plain-LJ + plain Coulomb normal type.
  *
  * This function is templated for real/SimdReal and for optimization.
+ * Energies and shift forces are only supported with SimdReal.
+ *
+ * Pairs with an atom that is marked in \p atomIsPerturbed are skipped
+ * and \p haveSkippedPerturbedPairs is set to true when there are such pairs.
+ * Pass an empty \p atomIsPerturbed to compute all pairs.
  */
-template<typename T, int pack_size, typename pbc_type>
+template<typename T, int pack_size, typename pbc_type, BondedKernelFlavor flavor>
 static void do_pairs_simple(int                       nbonds,
                             const t_iatom             iatoms[],
                             const t_iparams           iparams[],
                             const rvec                x[],
                             rvec4                     f[],
+                            rvec gmx_unused           fshift[],
                             const pbc_type            pbc,
                             gmx::ArrayRef<const real> charge,
-                            const real                scale_factor)
+                            const real                scale_factor,
+                            gmx::ArrayRef<const bool> atomIsPerturbed,
+                            bool*                     haveSkippedPerturbedPairs,
+                            real gmx_unused*          vCoulomb,
+                            real gmx_unused*          vVdw)
 {
+    static_assert(!computeEnergyOrVirial(flavor) || pack_size > 1,
+                  "Energies and virial are only supported with SIMD");
+
     const int nfa1 = 1 + 2;
 
     T six(6);
@@ -868,6 +882,12 @@ static void do_pairs_simple(int                       nbonds,
     std::int32_t ai[pack_size];
     std::int32_t aj[pack_size];
     real         coeff[3 * pack_size];
+#endif
+
+    [[maybe_unused]] T vCoulomb_S(0);
+    [[maybe_unused]] T vVdw_S(0);
+#if GMX_SIMD_HAVE_REAL
+    SimdShiftForceAccumulator shiftForces;
 #endif
 
     /* nbonds is #pairs*nfa1, here we step pack_size pairs */
@@ -885,9 +905,20 @@ static void do_pairs_simple(int                       nbonds,
 
             if (i + s * nfa1 < nbonds)
             {
-                coeff[0 * pack_size + s] = iparams[itype].lj14.c6A;
-                coeff[1 * pack_size + s] = iparams[itype].lj14.c12A;
-                coeff[2 * pack_size + s] = charge[ai[s]] * charge[aj[s]];
+                if (!atomIsPerturbed.empty() && (atomIsPerturbed[ai[s]] || atomIsPerturbed[aj[s]]))
+                {
+                    /* This pair needs the free-energy kernel, which is called later */
+                    coeff[0 * pack_size + s]   = 0;
+                    coeff[1 * pack_size + s]   = 0;
+                    coeff[2 * pack_size + s]   = 0;
+                    *haveSkippedPerturbedPairs = true;
+                }
+                else
+                {
+                    coeff[0 * pack_size + s] = iparams[itype].lj14.c6A;
+                    coeff[1 * pack_size + s] = iparams[itype].lj14.c12A;
+                    coeff[2 * pack_size + s] = charge[ai[s]] * charge[aj[s]];
+                }
 
                 /* Avoid indexing the iatoms array out of bounds.
                  * We pad the coordinate indices with the last atom pair.
@@ -911,27 +942,45 @@ static void do_pairs_simple(int                       nbonds,
         gatherLoadUTranspose<3>(reinterpret_cast<const real*>(x), ai, &xi[XX], &xi[YY], &xi[ZZ]);
         gatherLoadUTranspose<3>(reinterpret_cast<const real*>(x), aj, &xj[XX], &xj[YY], &xj[ZZ]);
 
-        T c6  = load<T>(coeff + 0 * pack_size);
-        T c12 = load<T>(coeff + 1 * pack_size);
-        T qq  = load<T>(coeff + 2 * pack_size);
-
-        /* We could save these operations by storing 6*C6,12*C12 */
-        c6  = six * c6;
-        c12 = twelve * c12;
+        const T c6  = load<T>(coeff + 0 * pack_size);
+        const T c12 = load<T>(coeff + 1 * pack_size);
+        const T qq  = load<T>(coeff + 2 * pack_size);
 
         T dr[DIM];
-        pbc_dx_aiuc(pbc, xi, xj, dr);
+#if GMX_SIMD_HAVE_REAL
+        [[maybe_unused]] T sh[DIM];
+        if constexpr (computeVirial(flavor))
+        {
+            for (int d = 0; d < DIM; d++)
+            {
+                dr[d] = xi[d] - xj[d];
+            }
+            pbc_correct_dx_simd(&dr[XX], &dr[YY], &dr[ZZ], pbc, sh);
+        }
+        else
+#endif
+        {
+            pbc_dx_aiuc(pbc, xi, xj, dr);
+        }
 
         T rsq   = dr[XX] * dr[XX] + dr[YY] * dr[YY] + dr[ZZ] * dr[ZZ];
         T rinv  = gmx::invsqrt(rsq);
         T rinv2 = rinv * rinv;
         T rinv6 = rinv2 * rinv2 * rinv2;
 
-        /* Calculate the Coulomb force * r */
+        /* Calculate the Coulomb force * r, which is also the Coulomb energy */
         T cfr = ef * qq * rinv;
 
-        /* Calculate the LJ force * r and add it to the Coulomb part */
-        T fr = gmx::fma(fms(c12, rinv6, c6), rinv6, cfr);
+        /* Calculate the LJ force * r and add it to the Coulomb part.
+         * We could save these operations by storing 6*C6,12*C12.
+         */
+        T fr = gmx::fma(fms(twelve * c12, rinv6, six * c6), rinv6, cfr);
+
+        if constexpr (computeEnergy(flavor))
+        {
+            vCoulomb_S = vCoulomb_S + cfr;
+            vVdw_S     = gmx::fma(fms(c12, rinv6, c6), rinv6, vVdw_S);
+        }
 
         T finvr = fr * rinv2;
         T fx    = finvr * dr[XX];
@@ -944,7 +993,26 @@ static void do_pairs_simple(int                       nbonds,
          */
         transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ai, fx, fy, fz);
         transposeScatterDecrU<4>(reinterpret_cast<real*>(f), aj, fx, fy, fz);
+
+#if GMX_SIMD_HAVE_REAL
+        if constexpr (computeVirial(flavor))
+        {
+            shiftForces.add(sh, fx, fy, fz);
+        }
+#endif
     }
+
+#if GMX_SIMD_HAVE_REAL
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+    if constexpr (computeEnergy(flavor))
+    {
+        *vCoulomb += reduce(vCoulomb_S);
+        *vVdw += reduce(vVdw_S);
+    }
+#endif
 }
 
 /*! \brief Calculate all listed pair interactions */
@@ -969,26 +1037,87 @@ void do_pairs(InteractionFunction                 ftype,
               gmx_grppairener_t*                  grppener,
               int*                                global_atom_index)
 {
-    if (ftype == InteractionFunction::LennardJones14 && fr.ic->vdw.type != VanDerWaalsType::User
-        && !usingUserTableElectrostatics(fr.ic->coulomb.type) && !havePerturbedInteractions
-        && (!stepWork.computeVirial && !stepWork.computeEnergy))
+    /* Calls the general, free-energy capable, kernel with the flavor for this step */
+    auto doPairsGeneral = [&](const int numIatoms, const t_iatom* iatomsGeneral)
     {
-        /* We use a fast code-path for plain LJ 1-4 without FEP.
-         *
-         * TODO: Add support for energies (straightforward) and virial
-         * in the SIMD template. For the virial it's inconvenient to store
-         * the force sums for the shifts and we should directly calculate
-         * and sum the virial for the shifts. But we should do this
-         * at once for the angles and dihedrals as well.
-         */
+        if (stepWork.computeVirial)
+        {
+            do_pairs_general<BondedKernelFlavor::ForcesAndVirialAndEnergy>(ftype,
+                                                                           numIatoms,
+                                                                           iatomsGeneral,
+                                                                           iparams,
+                                                                           x,
+                                                                           f,
+                                                                           fshift,
+                                                                           pbc,
+                                                                           lambda,
+                                                                           dvdl,
+                                                                           chargeA,
+                                                                           chargeB,
+                                                                           atomIsPerturbed,
+                                                                           cENER,
+                                                                           numEnergyGroups,
+                                                                           fr,
+                                                                           grppener,
+                                                                           global_atom_index);
+        }
+        else
+        {
+            do_pairs_general<BondedKernelFlavor::ForcesAndEnergy>(ftype,
+                                                                  numIatoms,
+                                                                  iatomsGeneral,
+                                                                  iparams,
+                                                                  x,
+                                                                  f,
+                                                                  fshift,
+                                                                  pbc,
+                                                                  lambda,
+                                                                  dvdl,
+                                                                  chargeA,
+                                                                  chargeB,
+                                                                  atomIsPerturbed,
+                                                                  cENER,
+                                                                  numEnergyGroups,
+                                                                  fr,
+                                                                  grppener,
+                                                                  global_atom_index);
+        }
+    };
+
+    /* We use a fast code-path for plain LJ 1-4 without FEP */
+    const bool usePlainLJ14 =
+            (ftype == InteractionFunction::LennardJones14 && fr.ic->vdw.type != VanDerWaalsType::User
+             && !usingUserTableElectrostatics(fr.ic->coulomb.type) && !havePerturbedInteractions);
+
+    /* Pairs with a perturbed atom use the free-energy kernel, e.g. for soft-core,
+     * also when the pair itself is not perturbed, so the fast path skips them.
+     */
+    const gmx::ArrayRef<const bool> atomIsPerturbedToSkip =
+            (fr.efep != FreeEnergyPerturbationType::No ? atomIsPerturbed : gmx::ArrayRef<const bool>{});
+    bool haveSkippedPerturbedPairs = false;
+
+    if (usePlainLJ14 && !stepWork.computeVirial && !stepWork.computeEnergy)
+    {
 #if GMX_SIMD_HAVE_REAL
         if (fr.use_simd_kernels)
         {
             alignas(GMX_SIMD_ALIGNMENT) real pbc_simd[9 * GMX_SIMD_REAL_WIDTH];
             set_pbc_simd(pbc, pbc_simd);
 
-            do_pairs_simple<SimdReal, GMX_SIMD_REAL_WIDTH, const real*>(
-                    nbonds, iatoms, iparams, x, f, pbc_simd, chargeA, fr.ic->coulomb.epsfac * fr.fudgeQQ);
+            do_pairs_simple<SimdReal, GMX_SIMD_REAL_WIDTH, const real*, BondedKernelFlavor::ForcesSimdWhenAvailable>(
+                    nbonds,
+                    iatoms,
+                    iparams,
+                    x,
+                    f,
+                    fshift,
+                    pbc_simd,
+                    chargeA,
+                    fr.ic->coulomb.epsfac * fr.fudgeQQ,
+                    atomIsPerturbedToSkip,
+                    &haveSkippedPerturbedPairs,
+                    nullptr,
+                    nullptr);
         }
         else
 #endif
@@ -1007,50 +1136,87 @@ void do_pairs(InteractionFunction                 ftype,
                 pbc_nonnull = &pbc_no;
             }
 
-            do_pairs_simple<real, 1, const t_pbc*>(
-                    nbonds, iatoms, iparams, x, f, pbc_nonnull, chargeA, fr.ic->coulomb.epsfac * fr.fudgeQQ);
+            do_pairs_simple<real, 1, const t_pbc*, BondedKernelFlavor::ForcesNoSimd>(
+                    nbonds,
+                    iatoms,
+                    iparams,
+                    x,
+                    f,
+                    fshift,
+                    pbc_nonnull,
+                    chargeA,
+                    fr.ic->coulomb.epsfac * fr.fudgeQQ,
+                    atomIsPerturbedToSkip,
+                    &haveSkippedPerturbedPairs,
+                    nullptr,
+                    nullptr);
         }
     }
-    else if (stepWork.computeVirial)
+#if GMX_SIMD_HAVE_REAL
+    /* The SIMD kernel accumulates the energies in a single group pair and computes
+     * the virial from the PBC shifts along the box vectors, which does not work
+     * with screw PBC.
+     */
+    else if (usePlainLJ14 && fr.use_simd_kernels && numEnergyGroups == 1
+             && !(stepWork.computeVirial && fr.pbcType == PbcType::Screw))
     {
-        do_pairs_general<BondedKernelFlavor::ForcesAndVirialAndEnergy>(ftype,
-                                                                       nbonds,
-                                                                       iatoms,
-                                                                       iparams,
-                                                                       x,
-                                                                       f,
-                                                                       fshift,
-                                                                       pbc,
-                                                                       lambda,
-                                                                       dvdl,
-                                                                       chargeA,
-                                                                       chargeB,
-                                                                       makeArrayRef(atomIsPerturbed),
-                                                                       cENER,
-                                                                       numEnergyGroups,
-                                                                       fr,
-                                                                       grppener,
-                                                                       global_atom_index);
+        alignas(GMX_SIMD_ALIGNMENT) real pbc_simd[9 * GMX_SIMD_REAL_WIDTH];
+        set_pbc_simd(pbc, pbc_simd);
+
+        real* vCoulomb = &grppener->energyGroupPairTerms[NonBondedEnergyTerms::Coulomb14][0];
+        real* vVdw     = &grppener->energyGroupPairTerms[NonBondedEnergyTerms::LJ14][0];
+
+        if (stepWork.computeVirial)
+        {
+            do_pairs_simple<SimdReal, GMX_SIMD_REAL_WIDTH, const real*, BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable>(
+                    nbonds,
+                    iatoms,
+                    iparams,
+                    x,
+                    f,
+                    fshift,
+                    pbc_simd,
+                    chargeA,
+                    fr.ic->coulomb.epsfac * fr.fudgeQQ,
+                    atomIsPerturbedToSkip,
+                    &haveSkippedPerturbedPairs,
+                    vCoulomb,
+                    vVdw);
+        }
+        else
+        {
+            do_pairs_simple<SimdReal, GMX_SIMD_REAL_WIDTH, const real*, BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable>(
+                    nbonds,
+                    iatoms,
+                    iparams,
+                    x,
+                    f,
+                    fshift,
+                    pbc_simd,
+                    chargeA,
+                    fr.ic->coulomb.epsfac * fr.fudgeQQ,
+                    atomIsPerturbedToSkip,
+                    &haveSkippedPerturbedPairs,
+                    vCoulomb,
+                    vVdw);
+        }
     }
+#endif
     else
     {
-        do_pairs_general<BondedKernelFlavor::ForcesAndEnergy>(ftype,
-                                                              nbonds,
-                                                              iatoms,
-                                                              iparams,
-                                                              x,
-                                                              f,
-                                                              fshift,
-                                                              pbc,
-                                                              lambda,
-                                                              dvdl,
-                                                              chargeA,
-                                                              chargeB,
-                                                              atomIsPerturbed,
-                                                              cENER,
-                                                              numEnergyGroups,
-                                                              fr,
-                                                              grppener,
-                                                              global_atom_index);
+        doPairsGeneral(nbonds, iatoms);
+    }
+
+    if (haveSkippedPerturbedPairs)
+    {
+        /* Compute the pairs involving perturbed atoms that were skipped above */
+        constexpr int c_numIatomsPerPair = 1 + 2;
+        for (int i = 0; i < nbonds; i += c_numIatomsPerPair)
+        {
+            if (atomIsPerturbed[iatoms[i + 1]] || atomIsPerturbed[iatoms[i + 2]])
+            {
+                doPairsGeneral(c_numIatomsPerPair, iatoms + i);
+            }
+        }
     }
 }

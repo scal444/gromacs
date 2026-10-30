@@ -276,12 +276,17 @@ private:
                                      gmx_enerdata_t*                     enerd,
                                      gmx::ArrayRef<const real>           lambda,
                                      gmx::ArrayRef<real>                 dvdl);
-    /*! \brief Calculate all of one kind of bonded interactions for this thread */
+    /*! \brief Calculate all of one kind of bonded interactions for this thread
+     *
+     * The interactions in \p iatoms before index \p numNonperturbedIatoms are not
+     * perturbed and can use SIMD kernels, the ones from that index on are
+     * computed with kernels that support free-energy perturbation.
+     */
     real calcOneBond(int                                 thread,
                      InteractionFunction                 ftype,
                      const InteractionDefinitions&       idef,
                      gmx::ArrayRef<const int>            iatoms,
-                     bool                                havePerturbedInteractions,
+                     int                                 numNonperturbedIatoms,
                      const WorkDivision&                 workDivision,
                      const rvec                          x[],
                      rvec4                               f[],

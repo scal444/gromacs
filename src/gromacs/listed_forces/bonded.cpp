@@ -81,6 +81,7 @@
 
 #include "listed_internal.h"
 #include "restcbt.h"
+#include "shift_forces_simd.h"
 
 using namespace gmx; // TODO: Remove when this file is moved into gmx namespace
 
@@ -88,7 +89,9 @@ const EnumerationArray<BondedKernelFlavor, std::string> c_bondedKernelFlavorStri
     "forces, using SIMD when available",
     "forces, not using SIMD",
     "forces, virial, and energy (ie. not using SIMD)",
-    "forces and energy (ie. not using SIMD)"
+    "forces and energy (ie. not using SIMD)",
+    "forces and energy, using SIMD when available",
+    "forces, virial, and energy, using SIMD when available"
 };
 namespace
 {
@@ -455,7 +458,7 @@ real harmonic(real kA, real kB, real xA, real xB, real x, real lambda, real* V, 
 }
 
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor != BondedKernelFlavor::ForcesSimdWhenAvailable || !GMX_SIMD_HAVE_REAL, real>
+std::enable_if_t<!useSimdWhenAvailable(flavor) || !GMX_SIMD_HAVE_REAL, real>
 bonds(int             nbonds,
       const t_iatom   forceatoms[],
       const t_iparams forceparams[],
@@ -511,27 +514,27 @@ bonds(int             nbonds,
 
 #if GMX_SIMD_HAVE_REAL
 
-/*! \brief Computes forces (only) for harmonic bonds using SIMD intrinsics
+/*! \brief Computes forces for harmonic bonds using SIMD intrinsics
  *
  * As plain-C bonds(), but using SIMD to calculate many bonds at once.
- * This routines does not calculate energies and shift forces.
+ * Energies and shift forces are computed when \p flavor requests them.
+ * Only the A-state parameters are used.
  */
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor == BondedKernelFlavor::ForcesSimdWhenAvailable, real>
-bonds(int              nbonds,
-      const t_iatom    forceatoms[],
-      const t_iparams  forceparams[],
-      const rvec       x[],
-      rvec4            f[],
-      rvec gmx_unused  fshift[],
-      const t_pbc*     pbc,
-      real gmx_unused  lambda,
-      real gmx_unused* dvdlambda,
-      gmx::ArrayRef<const real> /*charge*/,
-      t_fcdata gmx_unused*     fcd,
-      t_disresdata gmx_unused* disresdata,
-      t_oriresdata gmx_unused* oriresdata,
-      int gmx_unused*          global_atom_index)
+std::enable_if_t<useSimdWhenAvailable(flavor), real> bonds(int              nbonds,
+                                                           const t_iatom    forceatoms[],
+                                                           const t_iparams  forceparams[],
+                                                           const rvec       x[],
+                                                           rvec4            f[],
+                                                           rvec             fshift[],
+                                                           const t_pbc*     pbc,
+                                                           real gmx_unused  lambda,
+                                                           real gmx_unused* dvdlambda,
+                                                           gmx::ArrayRef<const real> /*charge*/,
+                                                           t_fcdata gmx_unused*     fcd,
+                                                           t_disresdata gmx_unused* disresdata,
+                                                           t_oriresdata gmx_unused* oriresdata,
+                                                           int gmx_unused* global_atom_index)
 {
     constexpr int                            nfa1 = 3;
     alignas(GMX_SIMD_ALIGNMENT) std::int32_t ai[GMX_SIMD_REAL_WIDTH];
@@ -543,6 +546,9 @@ bonds(int              nbonds,
     set_pbc_simd(pbc, pbc_simd);
 
     const SimdReal real_eps = SimdReal(GMX_REAL_EPS);
+
+    SimdReal                  vtot_S = setZero();
+    SimdShiftForceAccumulator shiftForces;
 
     /* nbonds is the number of bonds times nfa1, here we step GMX_SIMD_REAL_WIDTH angles */
     for (int i = 0; i < nbonds; i += GMX_SIMD_REAL_WIDTH * nfa1)
@@ -584,7 +590,8 @@ bonds(int              nbonds,
         SimdReal rij_y = yi - yj;
         SimdReal rij_z = zi - zj;
 
-        pbc_correct_dx_simd(&rij_x, &rij_y, &rij_z, pbc_simd);
+        SimdReal sh_ij[DIM];
+        pbc_correct_dx_simd(&rij_x, &rij_y, &rij_z, pbc_simd, sh_ij);
 
         const SimdReal dist2 = rij_x * rij_x + rij_y * rij_y + rij_z * rij_z;
         // Here we avoid sqrt(0), the force will be zero because rij=0
@@ -593,8 +600,16 @@ bonds(int              nbonds,
         const SimdReal k  = load<SimdReal>(coeff);
         const SimdReal r0 = load<SimdReal>(coeff + GMX_SIMD_REAL_WIDTH);
 
+        const SimdReal dr = dist2 * invDist - r0;
+
         // Compute the force divided by the distance
-        const SimdReal forceOverR = -k * (dist2 * invDist - r0) * invDist;
+        const SimdReal forceOverR = -k * dr * invDist;
+
+        if constexpr (computeEnergy(flavor))
+        {
+            // As the plain-C kernel, we skip the energy of zero-length bonds
+            vtot_S = vtot_S + selectByMask(0.5_real * k * dr * dr, setZero() < dist2);
+        }
 
         const SimdReal f_x = forceOverR * rij_x;
         const SimdReal f_y = forceOverR * rij_y;
@@ -602,9 +617,19 @@ bonds(int              nbonds,
 
         transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ai, f_x, f_y, f_z);
         transposeScatterDecrU<4>(reinterpret_cast<real*>(f), aj, f_x, f_y, f_z);
+
+        if constexpr (computeVirial(flavor))
+        {
+            shiftForces.add(sh_ij, f_x, f_y, f_z);
+        }
     }
 
-    return 0;
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+
+    return computeEnergy(flavor) ? reduce(vtot_S) : 0;
 }
 
 #endif // GMX_SIMD_HAVE_REAL
@@ -991,7 +1016,7 @@ real thole_pol(int                       nbonds,
 }
 
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor != BondedKernelFlavor::ForcesSimdWhenAvailable || !GMX_SIMD_HAVE_REAL, real>
+std::enable_if_t<!useSimdWhenAvailable(flavor) || !GMX_SIMD_HAVE_REAL, real>
 angles(int             nbonds,
        const t_iatom   forceatoms[],
        const t_iparams forceparams[],
@@ -1077,24 +1102,24 @@ angles(int             nbonds,
 #if GMX_SIMD_HAVE_REAL
 
 /* As angles, but using SIMD to calculate many angles at once.
- * This routines does not calculate energies and shift forces.
+ * Energies and shift forces are computed when flavor requests them.
+ * Only the A-state parameters are used.
  */
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor == BondedKernelFlavor::ForcesSimdWhenAvailable, real>
-angles(int              nbonds,
-       const t_iatom    forceatoms[],
-       const t_iparams  forceparams[],
-       const rvec       x[],
-       rvec4            f[],
-       rvec gmx_unused  fshift[],
-       const t_pbc*     pbc,
-       real gmx_unused  lambda,
-       real gmx_unused* dvdlambda,
-       gmx::ArrayRef<const real> /*charge*/,
-       t_fcdata gmx_unused*     fcd,
-       t_disresdata gmx_unused* disresdata,
-       t_oriresdata gmx_unused* oriresdata,
-       int gmx_unused*          global_atom_index)
+std::enable_if_t<useSimdWhenAvailable(flavor), real> angles(int              nbonds,
+                                                            const t_iatom    forceatoms[],
+                                                            const t_iparams  forceparams[],
+                                                            const rvec       x[],
+                                                            rvec4            f[],
+                                                            rvec             fshift[],
+                                                            const t_pbc*     pbc,
+                                                            real gmx_unused  lambda,
+                                                            real gmx_unused* dvdlambda,
+                                                            gmx::ArrayRef<const real> /*charge*/,
+                                                            t_fcdata gmx_unused*     fcd,
+                                                            t_disresdata gmx_unused* disresdata,
+                                                            t_oriresdata gmx_unused* oriresdata,
+                                                            int gmx_unused* global_atom_index)
 {
     const int                                nfa1 = 4;
     int                                      i, iu, s;
@@ -1126,6 +1151,9 @@ angles(int              nbonds,
     alignas(GMX_SIMD_ALIGNMENT) real pbc_simd[9 * GMX_SIMD_REAL_WIDTH];
 
     set_pbc_simd(pbc, pbc_simd);
+
+    SimdReal                  vtot_S = setZero();
+    SimdShiftForceAccumulator shiftForces;
 
     /* nbonds is the number of angles times nfa1, here we step GMX_SIMD_REAL_WIDTH angles */
     for (i = 0; (i < nbonds); i += GMX_SIMD_REAL_WIDTH * nfa1)
@@ -1173,8 +1201,9 @@ angles(int              nbonds,
         k_S      = load<SimdReal>(coeff);
         theta0_S = load<SimdReal>(coeff + GMX_SIMD_REAL_WIDTH) * deg2rad_S;
 
-        pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd);
-        pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd);
+        SimdReal sh_ij[DIM], sh_kj[DIM];
+        pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd, sh_ij);
+        pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd, sh_kj);
 
         rij_rkj_S = iprod(rijx_S, rijy_S, rijz_S, rkjx_S, rkjy_S, rkjz_S);
 
@@ -1209,7 +1238,13 @@ angles(int              nbonds,
 
         invsin_S = invsqrt(one_S - cos2_S);
 
-        st_S  = k_S * (theta0_S - theta_S) * invsin_S;
+        st_S = k_S * (theta0_S - theta_S) * invsin_S;
+
+        if constexpr (computeEnergy(flavor))
+        {
+            const SimdReal dtheta_S = theta_S - theta0_S;
+            vtot_S                  = vtot_S + 0.5_real * k_S * dtheta_S * dtheta_S;
+        }
         sth_S = st_S * cos_S;
 
         cik_S = st_S * nrij_1_S * nrkj_1_S;
@@ -1233,9 +1268,20 @@ angles(int              nbonds,
         transposeScatterDecrU<4>(
                 reinterpret_cast<real*>(f), aj, f_ix_S + f_kx_S, f_iy_S + f_ky_S, f_iz_S + f_kz_S);
         transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ak, f_kx_S, f_ky_S, f_kz_S);
+
+        if constexpr (computeVirial(flavor))
+        {
+            shiftForces.add(sh_ij, f_ix_S, f_iy_S, f_iz_S);
+            shiftForces.add(sh_kj, f_kx_S, f_ky_S, f_kz_S);
+        }
     }
 
-    return 0;
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+
+    return computeEnergy(flavor) ? reduce(vtot_S) : 0;
 }
 
 #endif // GMX_SIMD_HAVE_REAL
@@ -1312,7 +1358,7 @@ real linear_angles(int             nbonds,
 }
 
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor != BondedKernelFlavor::ForcesSimdWhenAvailable || !GMX_SIMD_HAVE_REAL, real>
+std::enable_if_t<!useSimdWhenAvailable(flavor) || !GMX_SIMD_HAVE_REAL, real>
 urey_bradley(int             nbonds,
              const t_iatom   forceatoms[],
              const t_iparams forceparams[],
@@ -1421,24 +1467,24 @@ urey_bradley(int             nbonds,
 #if GMX_SIMD_HAVE_REAL
 
 /* As urey_bradley, but using SIMD to calculate many potentials at once.
- * This routines does not calculate energies and shift forces.
+ * Energies and shift forces are computed when flavor requests them.
+ * Only the A-state parameters are used.
  */
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor == BondedKernelFlavor::ForcesSimdWhenAvailable, real>
-urey_bradley(int              nbonds,
-             const t_iatom    forceatoms[],
-             const t_iparams  forceparams[],
-             const rvec       x[],
-             rvec4            f[],
-             rvec gmx_unused  fshift[],
-             const t_pbc*     pbc,
-             real gmx_unused  lambda,
-             real gmx_unused* dvdlambda,
-             gmx::ArrayRef<const real> /*charge*/,
-             t_fcdata gmx_unused*     fcd,
-             t_disresdata gmx_unused* disresdata,
-             t_oriresdata gmx_unused* oriresdata,
-             int gmx_unused*          global_atom_index)
+std::enable_if_t<useSimdWhenAvailable(flavor), real> urey_bradley(int              nbonds,
+                                                                  const t_iatom    forceatoms[],
+                                                                  const t_iparams  forceparams[],
+                                                                  const rvec       x[],
+                                                                  rvec4            f[],
+                                                                  rvec             fshift[],
+                                                                  const t_pbc*     pbc,
+                                                                  real gmx_unused  lambda,
+                                                                  real gmx_unused* dvdlambda,
+                                                                  gmx::ArrayRef<const real> /*charge*/,
+                                                                  t_fcdata gmx_unused* fcd,
+                                                                  t_disresdata gmx_unused* disresdata,
+                                                                  t_oriresdata gmx_unused* oriresdata,
+                                                                  int gmx_unused* global_atom_index)
 {
     constexpr int                            nfa1 = 4;
     alignas(GMX_SIMD_ALIGNMENT) std::int32_t ai[GMX_SIMD_REAL_WIDTH];
@@ -1448,6 +1494,9 @@ urey_bradley(int              nbonds,
     alignas(GMX_SIMD_ALIGNMENT) real         pbc_simd[9 * GMX_SIMD_REAL_WIDTH];
 
     set_pbc_simd(pbc, pbc_simd);
+
+    SimdReal                  vtot_S = setZero();
+    SimdShiftForceAccumulator shiftForces;
 
     /* nbonds is the number of angles times nfa1, here we step GMX_SIMD_REAL_WIDTH angles */
     for (int i = 0; i < nbonds; i += GMX_SIMD_REAL_WIDTH * nfa1)
@@ -1508,9 +1557,10 @@ urey_bradley(int              nbonds,
         const SimdReal kUB_S    = load<SimdReal>(coeff + 2 * GMX_SIMD_REAL_WIDTH);
         const SimdReal r13_S    = load<SimdReal>(coeff + 3 * GMX_SIMD_REAL_WIDTH);
 
-        pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd);
-        pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd);
-        pbc_correct_dx_simd(&rikx_S, &riky_S, &rikz_S, pbc_simd);
+        SimdReal sh_ij[DIM], sh_kj[DIM], sh_ik[DIM];
+        pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd, sh_ij);
+        pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd, sh_kj);
+        pbc_correct_dx_simd(&rikx_S, &riky_S, &rikz_S, pbc_simd, sh_ik);
 
         const SimdReal rij_rkj_S = iprod(rijx_S, rijy_S, rijz_S, rkjx_S, rkjy_S, rkjz_S);
 
@@ -1546,24 +1596,51 @@ urey_bradley(int              nbonds,
 
         const SimdReal sUB_S = kUB_S * (r13_S - dr_S) * invdr2_S;
 
+        if constexpr (computeEnergy(flavor))
+        {
+            const SimdReal dtheta_S = theta_S - theta0_S;
+            const SimdReal dr13_S   = dr_S - r13_S;
+            vtot_S = vtot_S + 0.5_real * (ktheta_S * dtheta_S * dtheta_S + kUB_S * dr13_S * dr13_S);
+        }
+
         const SimdReal f_ikx_S = sUB_S * rikx_S;
         const SimdReal f_iky_S = sUB_S * riky_S;
         const SimdReal f_ikz_S = sUB_S * rikz_S;
 
-        const SimdReal f_ix_S = fnma(cik_S, rkjx_S, cii_S * rijx_S) + f_ikx_S;
-        const SimdReal f_iy_S = fnma(cik_S, rkjy_S, cii_S * rijy_S) + f_iky_S;
-        const SimdReal f_iz_S = fnma(cik_S, rkjz_S, cii_S * rijz_S) + f_ikz_S;
-        const SimdReal f_kx_S = fnma(cik_S, rijx_S, ckk_S * rkjx_S) - f_ikx_S;
-        const SimdReal f_ky_S = fnma(cik_S, rijy_S, ckk_S * rkjy_S) - f_iky_S;
-        const SimdReal f_kz_S = fnma(cik_S, rijz_S, ckk_S * rkjz_S) - f_ikz_S;
+        // The angle forces on atoms i and k
+        const SimdReal fa_ix_S = fnma(cik_S, rkjx_S, cii_S * rijx_S);
+        const SimdReal fa_iy_S = fnma(cik_S, rkjy_S, cii_S * rijy_S);
+        const SimdReal fa_iz_S = fnma(cik_S, rkjz_S, cii_S * rijz_S);
+        const SimdReal fa_kx_S = fnma(cik_S, rijx_S, ckk_S * rkjx_S);
+        const SimdReal fa_ky_S = fnma(cik_S, rijy_S, ckk_S * rkjy_S);
+        const SimdReal fa_kz_S = fnma(cik_S, rijz_S, ckk_S * rkjz_S);
+
+        const SimdReal f_ix_S = fa_ix_S + f_ikx_S;
+        const SimdReal f_iy_S = fa_iy_S + f_iky_S;
+        const SimdReal f_iz_S = fa_iz_S + f_ikz_S;
+        const SimdReal f_kx_S = fa_kx_S - f_ikx_S;
+        const SimdReal f_ky_S = fa_ky_S - f_iky_S;
+        const SimdReal f_kz_S = fa_kz_S - f_ikz_S;
 
         transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ai, f_ix_S, f_iy_S, f_iz_S);
         transposeScatterDecrU<4>(
                 reinterpret_cast<real*>(f), aj, f_ix_S + f_kx_S, f_iy_S + f_ky_S, f_iz_S + f_kz_S);
         transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ak, f_kx_S, f_ky_S, f_kz_S);
+
+        if constexpr (computeVirial(flavor))
+        {
+            shiftForces.add(sh_ij, fa_ix_S, fa_iy_S, fa_iz_S);
+            shiftForces.add(sh_kj, fa_kx_S, fa_ky_S, fa_kz_S);
+            shiftForces.add(sh_ik, f_ikx_S, f_iky_S, f_ikz_S);
+        }
     }
 
-    return 0;
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+
+    return computeEnergy(flavor) ? reduce(vtot_S) : 0;
 }
 
 #endif // GMX_SIMD_HAVE_REAL
@@ -1659,6 +1736,8 @@ real quartic_angles(int              nbonds,
 /* As dih_angle above, but calculates 4 dihedral angles at once using SIMD,
  * also calculates the pre-factor required for the dihedral force update.
  * Note that bv and buf should be register aligned.
+ * Returns in pbcShifts the PBC shifts (in units of box vectors) that were
+ * subtracted from r_ij, r_kj and r_kl, in that order.
  */
 inline void dih_angle_simd(const rvec* x,
                            const int*  ai,
@@ -1676,7 +1755,8 @@ inline void dih_angle_simd(const rvec* x,
                            SimdReal*   nrkj_m2_S,
                            SimdReal*   nrkj_n2_S,
                            SimdReal*   p_S,
-                           SimdReal*   q_S)
+                           SimdReal*   q_S,
+                           SimdReal    pbcShifts[3][DIM])
 {
     SimdReal xi_S, yi_S, zi_S;
     SimdReal xj_S, yj_S, zj_S;
@@ -1718,9 +1798,9 @@ inline void dih_angle_simd(const rvec* x,
     rkly_S = yk_S - yl_S;
     rklz_S = zk_S - zl_S;
 
-    pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd);
-    pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd);
-    pbc_correct_dx_simd(&rklx_S, &rkly_S, &rklz_S, pbc_simd);
+    pbc_correct_dx_simd(&rijx_S, &rijy_S, &rijz_S, pbc_simd, pbcShifts[0]);
+    pbc_correct_dx_simd(&rkjx_S, &rkjy_S, &rkjz_S, pbc_simd, pbcShifts[1]);
+    pbc_correct_dx_simd(&rklx_S, &rkly_S, &rklz_S, pbc_simd, pbcShifts[2]);
 
     cprod(rijx_S, rijy_S, rijz_S, rkjx_S, rkjy_S, rkjz_S, mx_S, my_S, mz_S);
 
@@ -1850,20 +1930,25 @@ namespace
 {
 
 #if GMX_SIMD_HAVE_REAL
-/* As do_dih_fup_noshiftf above, but with SIMD and pre-calculated pre-factors */
-inline void gmx_simdcall do_dih_fup_noshiftf_simd(const int* ai,
-                                                  const int* aj,
-                                                  const int* ak,
-                                                  const int* al,
-                                                  SimdReal   p,
-                                                  SimdReal   q,
-                                                  SimdReal   f_i_x,
-                                                  SimdReal   f_i_y,
-                                                  SimdReal   f_i_z,
-                                                  SimdReal   mf_l_x,
-                                                  SimdReal   mf_l_y,
-                                                  SimdReal   mf_l_z,
-                                                  rvec4      f[])
+/* As do_dih_fup above, but with SIMD and pre-calculated pre-factors.
+ * Accumulates shift forces in shiftForces when flavor requests the virial.
+ */
+template<BondedKernelFlavor flavor>
+inline void gmx_simdcall do_dih_fup_simd(const int*                 ai,
+                                         const int*                 aj,
+                                         const int*                 ak,
+                                         const int*                 al,
+                                         SimdReal                   p,
+                                         SimdReal                   q,
+                                         SimdReal                   f_i_x,
+                                         SimdReal                   f_i_y,
+                                         SimdReal                   f_i_z,
+                                         SimdReal                   mf_l_x,
+                                         SimdReal                   mf_l_y,
+                                         SimdReal                   mf_l_z,
+                                         const SimdReal             pbcShifts[3][DIM],
+                                         rvec4                      f[],
+                                         SimdShiftForceAccumulator* shiftForces)
 {
     SimdReal sx    = p * f_i_x + q * mf_l_x;
     SimdReal sy    = p * f_i_y + q * mf_l_y;
@@ -1878,6 +1963,16 @@ inline void gmx_simdcall do_dih_fup_noshiftf_simd(const int* ai,
     transposeScatterDecrU<4>(reinterpret_cast<real*>(f), aj, f_j_x, f_j_y, f_j_z);
     transposeScatterIncrU<4>(reinterpret_cast<real*>(f), ak, f_k_x, f_k_y, f_k_z);
     transposeScatterDecrU<4>(reinterpret_cast<real*>(f), al, mf_l_x, mf_l_y, mf_l_z);
+
+    if constexpr (computeVirial(flavor))
+    {
+        /* With atom j at home, the image of i is shifted by r_ij, of k by r_kj
+         * and of l by r_kj - r_kl. The forces on k and l sum to -s.
+         */
+        shiftForces->add(pbcShifts[0], f_i_x, f_i_y, f_i_z);
+        shiftForces->sub(pbcShifts[1], sx, sy, sz);
+        shiftForces->add(pbcShifts[2], mf_l_x, mf_l_y, mf_l_z);
+    }
 }
 #endif // GMX_SIMD_HAVE_REAL
 
@@ -1935,7 +2030,7 @@ real dopdihs_min(real cpA, real cpB, real phiA, real phiB, int mult, real phi, r
 }
 
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor != BondedKernelFlavor::ForcesSimdWhenAvailable || !GMX_SIMD_HAVE_REAL, real>
+std::enable_if_t<!useSimdWhenAvailable(flavor) || !GMX_SIMD_HAVE_REAL, real>
 pdihs(int             nbonds,
       const t_iatom   forceatoms[],
       const t_iparams forceparams[],
@@ -1998,21 +2093,20 @@ pdihs(int             nbonds,
 
 /* As pdihs above, but using SIMD to calculate multiple dihedrals at once */
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor == BondedKernelFlavor::ForcesSimdWhenAvailable, real>
-pdihs(int              nbonds,
-      const t_iatom    forceatoms[],
-      const t_iparams  forceparams[],
-      const rvec       x[],
-      rvec4            f[],
-      rvec gmx_unused  fshift[],
-      const t_pbc*     pbc,
-      real gmx_unused  lambda,
-      real gmx_unused* dvdlambda,
-      gmx::ArrayRef<const real> /*charge*/,
-      t_fcdata gmx_unused*     fcd,
-      t_disresdata gmx_unused* disresdata,
-      t_oriresdata gmx_unused* oriresdata,
-      int gmx_unused*          global_atom_index)
+std::enable_if_t<useSimdWhenAvailable(flavor), real> pdihs(int              nbonds,
+                                                           const t_iatom    forceatoms[],
+                                                           const t_iparams  forceparams[],
+                                                           const rvec       x[],
+                                                           rvec4            f[],
+                                                           rvec             fshift[],
+                                                           const t_pbc*     pbc,
+                                                           real gmx_unused  lambda,
+                                                           real gmx_unused* dvdlambda,
+                                                           gmx::ArrayRef<const real> /*charge*/,
+                                                           t_fcdata gmx_unused*     fcd,
+                                                           t_disresdata gmx_unused* disresdata,
+                                                           t_oriresdata gmx_unused* oriresdata,
+                                                           int gmx_unused* global_atom_index)
 {
     const int                                nfa1 = 5;
     int                                      i, iu, s;
@@ -2041,6 +2135,9 @@ pdihs(int              nbonds,
     mult = buf + 2 * GMX_SIMD_REAL_WIDTH;
 
     set_pbc_simd(pbc, pbc_simd);
+
+    SimdReal                  vtot_S = setZero();
+    SimdShiftForceAccumulator shiftForces;
 
     /* nbonds is the number of dihedrals times nfa1, here we step GMX_SIMD_REAL_WIDTH dihs */
     for (i = 0; (i < nbonds); i += GMX_SIMD_REAL_WIDTH * nfa1)
@@ -2078,8 +2175,25 @@ pdihs(int              nbonds,
         }
 
         /* Calculate GMX_SIMD_REAL_WIDTH dihedral angles at once */
-        dih_angle_simd(
-                x, ai, aj, ak, al, pbc_simd, &phi_S, &mx_S, &my_S, &mz_S, &nx_S, &ny_S, &nz_S, &nrkj_m2_S, &nrkj_n2_S, &p_S, &q_S);
+        SimdReal pbcShifts[3][DIM];
+        dih_angle_simd(x,
+                       ai,
+                       aj,
+                       ak,
+                       al,
+                       pbc_simd,
+                       &phi_S,
+                       &mx_S,
+                       &my_S,
+                       &mz_S,
+                       &nx_S,
+                       &ny_S,
+                       &nz_S,
+                       &nrkj_m2_S,
+                       &nrkj_n2_S,
+                       &p_S,
+                       &q_S,
+                       pbcShifts);
 
         cp_S   = load<SimdReal>(cp);
         phi0_S = load<SimdReal>(phi0) * deg2rad_S;
@@ -2090,8 +2204,13 @@ pdihs(int              nbonds,
         /* Calculate GMX_SIMD_REAL_WIDTH sines at once */
         sincos(mdphi_S, &sin_S, &cos_S);
         mddphi_S = cp_S * mult_S * sin_S;
-        sf_i_S   = mddphi_S * nrkj_m2_S;
-        msf_l_S  = mddphi_S * nrkj_n2_S;
+
+        if constexpr (computeEnergy(flavor))
+        {
+            vtot_S = fma(cp_S, SimdReal(1.0_real) + cos_S, vtot_S);
+        }
+        sf_i_S  = mddphi_S * nrkj_m2_S;
+        msf_l_S = mddphi_S * nrkj_n2_S;
 
         /* After this m?_S will contain f[i] */
         mx_S = sf_i_S * mx_S;
@@ -2103,32 +2222,37 @@ pdihs(int              nbonds,
         ny_S = msf_l_S * ny_S;
         nz_S = msf_l_S * nz_S;
 
-        do_dih_fup_noshiftf_simd(ai, aj, ak, al, p_S, q_S, mx_S, my_S, mz_S, nx_S, ny_S, nz_S, f);
+        do_dih_fup_simd<flavor>(
+                ai, aj, ak, al, p_S, q_S, mx_S, my_S, mz_S, nx_S, ny_S, nz_S, pbcShifts, f, &shiftForces);
     }
 
-    return 0;
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+
+    return computeEnergy(flavor) ? reduce(vtot_S) : 0;
 }
 
 /* This is mostly a copy of the SIMD flavor of pdihs above, but with using
  * the RB potential instead of a harmonic potential.
- * This function can replace rbdihs() when no energy and virial are needed.
+ * This function can replace rbdihs() for non-perturbed interactions.
  */
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor == BondedKernelFlavor::ForcesSimdWhenAvailable, real>
-rbdihs(int              nbonds,
-       const t_iatom    forceatoms[],
-       const t_iparams  forceparams[],
-       const rvec       x[],
-       rvec4            f[],
-       rvec gmx_unused  fshift[],
-       const t_pbc*     pbc,
-       real gmx_unused  lambda,
-       real gmx_unused* dvdlambda,
-       gmx::ArrayRef<const real> /*charge*/,
-       t_fcdata gmx_unused*     fcd,
-       t_disresdata gmx_unused* disresdata,
-       t_oriresdata gmx_unused* oriresdata,
-       int gmx_unused*          global_atom_index)
+std::enable_if_t<useSimdWhenAvailable(flavor), real> rbdihs(int              nbonds,
+                                                            const t_iatom    forceatoms[],
+                                                            const t_iparams  forceparams[],
+                                                            const rvec       x[],
+                                                            rvec4            f[],
+                                                            rvec             fshift[],
+                                                            const t_pbc*     pbc,
+                                                            real gmx_unused  lambda,
+                                                            real gmx_unused* dvdlambda,
+                                                            gmx::ArrayRef<const real> /*charge*/,
+                                                            t_fcdata gmx_unused*     fcd,
+                                                            t_disresdata gmx_unused* disresdata,
+                                                            t_oriresdata gmx_unused* oriresdata,
+                                                            int gmx_unused* global_atom_index)
 {
     const int                                nfa1 = 5;
     int                                      i, iu, s, j;
@@ -2155,6 +2279,14 @@ rbdihs(int              nbonds,
 
     set_pbc_simd(pbc, pbc_simd);
 
+    SimdReal                  vtot_S = setZero();
+    SimdShiftForceAccumulator shiftForces;
+
+    /* We don't need the first parameter for the forces, since that's a constant
+     * which only affects the energies.
+     */
+    constexpr int c_firstParameter = computeEnergy(flavor) ? 0 : 1;
+
     /* nbonds is the number of dihedrals times nfa1, here we step GMX_SIMD_REAL_WIDTH dihs */
     for (i = 0; (i < nbonds); i += GMX_SIMD_REAL_WIDTH * nfa1)
     {
@@ -2173,10 +2305,7 @@ rbdihs(int              nbonds,
             /* At the end fill the arrays with the last atoms and 0 params */
             if (i + s * nfa1 < nbonds)
             {
-                /* We don't need the first parameter, since that's a constant
-                 * which only affects the energies, not the forces.
-                 */
-                for (j = 1; j < NR_RBDIHS; j++)
+                for (j = c_firstParameter; j < NR_RBDIHS; j++)
                 {
                     parm[j * GMX_SIMD_REAL_WIDTH + s] = forceparams[type].rbdihs.rbcA[j];
                 }
@@ -2188,7 +2317,7 @@ rbdihs(int              nbonds,
             }
             else
             {
-                for (j = 1; j < NR_RBDIHS; j++)
+                for (j = c_firstParameter; j < NR_RBDIHS; j++)
                 {
                     parm[j * GMX_SIMD_REAL_WIDTH + s] = 0;
                 }
@@ -2196,8 +2325,25 @@ rbdihs(int              nbonds,
         }
 
         /* Calculate GMX_SIMD_REAL_WIDTH dihedral angles at once */
-        dih_angle_simd(
-                x, ai, aj, ak, al, pbc_simd, &phi_S, &mx_S, &my_S, &mz_S, &nx_S, &ny_S, &nz_S, &nrkj_m2_S, &nrkj_n2_S, &p_S, &q_S);
+        SimdReal pbcShifts[3][DIM];
+        dih_angle_simd(x,
+                       ai,
+                       aj,
+                       ak,
+                       al,
+                       pbc_simd,
+                       &phi_S,
+                       &mx_S,
+                       &my_S,
+                       &mz_S,
+                       &nx_S,
+                       &ny_S,
+                       &nz_S,
+                       &nrkj_m2_S,
+                       &nrkj_n2_S,
+                       &p_S,
+                       &q_S,
+                       pbcShifts);
 
         /* Change to polymer convention */
         phi_S = phi_S - pi_S;
@@ -2207,12 +2353,21 @@ rbdihs(int              nbonds,
         ddphi_S  = setZero();
         c_S      = one_S;
         cosfac_S = one_S;
+        if constexpr (computeEnergy(flavor))
+        {
+            vtot_S = vtot_S + load<SimdReal>(parm);
+        }
         for (j = 1; j < NR_RBDIHS; j++)
         {
-            parm_S   = load<SimdReal>(parm + j * GMX_SIMD_REAL_WIDTH);
-            ddphi_S  = fma(c_S * parm_S, cosfac_S, ddphi_S);
+            parm_S  = load<SimdReal>(parm + j * GMX_SIMD_REAL_WIDTH);
+            ddphi_S = fma(c_S * parm_S, cosfac_S, ddphi_S);
+            /* Here cosfac_S = cos^(j-1), so cosfac_S * cos_S = cos^j */
             cosfac_S = cosfac_S * cos_S;
-            c_S      = c_S + one_S;
+            if constexpr (computeEnergy(flavor))
+            {
+                vtot_S = fma(parm_S, cosfac_S, vtot_S);
+            }
+            c_S = c_S + one_S;
         }
 
         /* Note that here we do not use the minus sign which is present
@@ -2233,10 +2388,16 @@ rbdihs(int              nbonds,
         ny_S = msf_l_S * ny_S;
         nz_S = msf_l_S * nz_S;
 
-        do_dih_fup_noshiftf_simd(ai, aj, ak, al, p_S, q_S, mx_S, my_S, mz_S, nx_S, ny_S, nz_S, f);
+        do_dih_fup_simd<flavor>(
+                ai, aj, ak, al, p_S, q_S, mx_S, my_S, mz_S, nx_S, ny_S, nz_S, pbcShifts, f, &shiftForces);
     }
 
-    return 0;
+    if constexpr (computeVirial(flavor))
+    {
+        shiftForces.addToShiftForces(fshift);
+    }
+
+    return computeEnergy(flavor) ? reduce(vtot_S) : 0;
 }
 
 #endif // GMX_SIMD_HAVE_REAL
@@ -2904,7 +3065,7 @@ real cbtdihs(int              nbonds,
 }
 
 template<BondedKernelFlavor flavor>
-std::enable_if_t<flavor != BondedKernelFlavor::ForcesSimdWhenAvailable || !GMX_SIMD_HAVE_REAL, real>
+std::enable_if_t<!useSimdWhenAvailable(flavor) || !GMX_SIMD_HAVE_REAL, real>
 rbdihs(int             nbonds,
        const t_iatom   forceatoms[],
        const t_iparams forceparams[],
@@ -4087,14 +4248,46 @@ constexpr gmx::EnumerationArray<InteractionFunction, BondedInteractions> c_bonde
     BondedInteractions{ unimplemented, -1 }, // InteractionFunction::dVtemperaturedLambda
 };
 
+/*! \brief Returns the lookup table for a SIMD flavor
+ *
+ * The interaction types that have SIMD kernels use those with \p simdFlavor,
+ * all other types use the non-SIMD kernels of \p scalarFlavor, which
+ * should compute the same quantities.
+ */
+template<BondedKernelFlavor simdFlavor, BondedKernelFlavor scalarFlavor>
+gmx::EnumerationArray<InteractionFunction, BondedInteractions> makeSimdFlavorBondedInteractionFunctions()
+{
+    static_assert(useSimdWhenAvailable(simdFlavor) && !useSimdWhenAvailable(scalarFlavor)
+                          && computeEnergy(simdFlavor) == computeEnergy(scalarFlavor)
+                          && computeVirial(simdFlavor) == computeVirial(scalarFlavor),
+                  "The SIMD and scalar flavors should compute the same quantities");
+
+    gmx::EnumerationArray<InteractionFunction, BondedInteractions> functions =
+            c_bondedInteractionFunctions<scalarFlavor>;
+#if GMX_SIMD_HAVE_REAL
+    functions[InteractionFunction::Bonds]             = { bonds<simdFlavor>, eNR_BONDS };
+    functions[InteractionFunction::HarmonicPotential] = { bonds<simdFlavor>, eNR_BONDS };
+    functions[InteractionFunction::Angles]            = { angles<simdFlavor>, eNR_ANGLES };
+    functions[InteractionFunction::UreyBradleyPotential] = { urey_bradley<simdFlavor>, eNR_UREY_BRADLEY };
+    functions[InteractionFunction::ProperDihedrals]            = { pdihs<simdFlavor>, eNR_PROPER };
+    functions[InteractionFunction::RyckaertBellemansDihedrals] = { rbdihs<simdFlavor>, eNR_RB };
+    functions[InteractionFunction::FourierDihedrals]          = { rbdihs<simdFlavor>, eNR_FOURDIH };
+    functions[InteractionFunction::PeriodicImproperDihedrals] = { pdihs<simdFlavor>, eNR_IMPROPER };
+#endif
+    return functions;
+}
+
 /*! \brief List of instantiated BondedInteractions list */
-constexpr gmx::EnumerationArray<BondedKernelFlavor, gmx::EnumerationArray<InteractionFunction, BondedInteractions>>
-        c_bondedInteractionFunctionsPerFlavor = {
-            c_bondedInteractionFunctions<BondedKernelFlavor::ForcesSimdWhenAvailable>,
-            c_bondedInteractionFunctions<BondedKernelFlavor::ForcesNoSimd>,
-            c_bondedInteractionFunctions<BondedKernelFlavor::ForcesAndVirialAndEnergy>,
-            c_bondedInteractionFunctions<BondedKernelFlavor::ForcesAndEnergy>
-        };
+const gmx::EnumerationArray<BondedKernelFlavor, gmx::EnumerationArray<InteractionFunction, BondedInteractions>> c_bondedInteractionFunctionsPerFlavor = {
+    makeSimdFlavorBondedInteractionFunctions<BondedKernelFlavor::ForcesSimdWhenAvailable, BondedKernelFlavor::ForcesNoSimd>(),
+    c_bondedInteractionFunctions<BondedKernelFlavor::ForcesNoSimd>,
+    c_bondedInteractionFunctions<BondedKernelFlavor::ForcesAndVirialAndEnergy>,
+    c_bondedInteractionFunctions<BondedKernelFlavor::ForcesAndEnergy>,
+    makeSimdFlavorBondedInteractionFunctions<BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable,
+                                             BondedKernelFlavor::ForcesAndEnergy>(),
+    makeSimdFlavorBondedInteractionFunctions<BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable,
+                                             BondedKernelFlavor::ForcesAndVirialAndEnergy>()
+};
 
 //! \endcond
 

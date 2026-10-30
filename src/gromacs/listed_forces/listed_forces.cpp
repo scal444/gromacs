@@ -219,17 +219,34 @@ bool isPairInteraction(InteractionFunction ftype)
  * is requested (performance gain would be small).
  * Note that currently we do not have bonded kernels that
  * do not compute forces.
+ *
+ * \param[in] stepWork                   The step workload
+ * \param[in] useSimdKernels             Whether to use SIMD kernels when available
+ * \param[in] useSimdKernelsForVirial    Whether SIMD kernels can compute the virial
+ * \param[in] havePerturbedInteractions  Whether the interactions are perturbed
  */
 BondedKernelFlavor selectBondedKernelFlavor(const gmx::StepWorkload& stepWork,
                                             const bool               useSimdKernels,
+                                            const bool               useSimdKernelsForVirial,
                                             const bool               havePerturbedInteractions)
 {
     BondedKernelFlavor flavor;
-    if (stepWork.computeEnergy || stepWork.computeVirial)
+    if (stepWork.computeVirial)
     {
-        if (stepWork.computeVirial)
+        if (useSimdKernelsForVirial && !havePerturbedInteractions)
+        {
+            flavor = BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable;
+        }
+        else
         {
             flavor = BondedKernelFlavor::ForcesAndVirialAndEnergy;
+        }
+    }
+    else if (stepWork.computeEnergy)
+    {
+        if (useSimdKernels && !havePerturbedInteractions)
+        {
+            flavor = BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable;
         }
         else
         {
@@ -257,7 +274,7 @@ real ListedForces::calcOneBond(int                                 thread,
                                InteractionFunction                 ftype,
                                const InteractionDefinitions&       idef,
                                gmx::ArrayRef<const int>            iatoms,
-                               const bool                          havePerturbedInteractions,
+                               const int                           numNonperturbedIatoms,
                                const WorkDivision&                 workDivision,
                                const rvec                          x[],
                                rvec4                               f[],
@@ -278,8 +295,11 @@ real ListedForces::calcOneBond(int                                 thread,
     GMX_ASSERT(idef.ilsort == ilsortNO_FE || idef.ilsort == ilsortFE_SORTED,
                "The topology should be marked either as no FE or sorted on FE");
 
-    BondedKernelFlavor flavor =
-            selectBondedKernelFlavor(stepWork, fr_.use_simd_kernels, havePerturbedInteractions);
+    /* The SIMD kernels compute the virial through the PBC shifts along the box vectors,
+     * which does not work with screw PBC.
+     */
+    const bool useSimdKernelsForVirial = fr_.use_simd_kernels && fr_.pbcType != PbcType::Screw;
+
     FreeEnergyPerturbationCouplingType efptFTYPE;
     if (IS_RESTRAINT_TYPE(ftype))
     {
@@ -302,76 +322,95 @@ real ListedForces::calcOneBond(int                                 thread,
 
     ArrayRef<const t_iparams> iparams = idef.iparams;
 
+    /* Split our range into a non-perturbed part, for which we can use SIMD kernels,
+     * and a perturbed part, which needs the kernels that support FEP.
+     * Note that perturbed interactions are sorted to the end of the list.
+     */
+    const int nbSplit = std::clamp(numNonperturbedIatoms, nb0, nb0 + nbn);
+
     real v = 0;
-    if (!isPairInteraction(ftype))
+    if (ftype == InteractionFunction::DihedralEnergyCorrectionMap)
     {
-        if (ftype == InteractionFunction::DihedralEnergyCorrectionMap)
-        {
-            /* TODO The execution time for CMAP dihedrals might be
-               nice to account to its own subtimer, but first
-               wallcycle needs to be extended to support calling from
-               multiple threads. */
-            v = cmap_dihs(nbn,
-                          iatoms.data() + nb0,
-                          iparams.data(),
-                          idef.cmapGrids,
-                          x,
-                          f,
-                          fshift,
-                          pbc,
-                          lambda[static_cast<int>(efptFTYPE)],
-                          &(dvdl[static_cast<int>(efptFTYPE)]),
-                          chargeA,
-                          fcd,
-                          nullptr,
-                          nullptr,
-                          global_atom_index);
-        }
-        else
-        {
-            v = calculateSimpleBond(ftype,
-                                    nbn,
-                                    iatoms.data() + nb0,
-                                    iparams.data(),
-                                    x,
-                                    f,
-                                    fshift,
-                                    pbc,
-                                    lambda[static_cast<int>(efptFTYPE)],
-                                    &(dvdl[static_cast<int>(efptFTYPE)]),
-                                    chargeA,
-                                    fcd,
-                                    fcd->disres,
-                                    fcd->orires.get(),
-                                    global_atom_index,
-                                    flavor);
-        }
+        /* TODO The execution time for CMAP dihedrals might be
+           nice to account to its own subtimer, but first
+           wallcycle needs to be extended to support calling from
+           multiple threads. */
+        v = cmap_dihs(nbn,
+                      iatoms.data() + nb0,
+                      iparams.data(),
+                      idef.cmapGrids,
+                      x,
+                      f,
+                      fshift,
+                      pbc,
+                      lambda[static_cast<int>(efptFTYPE)],
+                      &(dvdl[static_cast<int>(efptFTYPE)]),
+                      chargeA,
+                      fcd,
+                      nullptr,
+                      nullptr,
+                      global_atom_index);
     }
     else
     {
-        /* TODO The execution time for pairs might be nice to account
-           to its own subtimer, but first wallcycle needs to be
-           extended to support calling from multiple threads. */
-        do_pairs(ftype,
-                 nbn,
-                 iatoms.data() + nb0,
-                 iparams.data(),
-                 x,
-                 f,
-                 fshift,
-                 pbc,
-                 lambda.data(),
-                 dvdl.data(),
-                 chargeA,
-                 chargeB,
-                 atomIsPerturbed,
-                 cENER,
-                 numEnergyGroups,
-                 fr_,
-                 havePerturbedInteractions,
-                 stepWork,
-                 grpp,
-                 global_atom_index);
+        for (const bool perturbed : { false, true })
+        {
+            const int start = (perturbed ? nbSplit : nb0);
+            const int count = (perturbed ? nb0 + nbn - nbSplit : nbSplit - nb0);
+            if (count == 0)
+            {
+                continue;
+            }
+
+            if (!isPairInteraction(ftype))
+            {
+                const BondedKernelFlavor flavor = selectBondedKernelFlavor(
+                        stepWork, fr_.use_simd_kernels, useSimdKernelsForVirial, perturbed);
+
+                v += calculateSimpleBond(ftype,
+                                         count,
+                                         iatoms.data() + start,
+                                         iparams.data(),
+                                         x,
+                                         f,
+                                         fshift,
+                                         pbc,
+                                         lambda[static_cast<int>(efptFTYPE)],
+                                         &(dvdl[static_cast<int>(efptFTYPE)]),
+                                         chargeA,
+                                         fcd,
+                                         fcd->disres,
+                                         fcd->orires.get(),
+                                         global_atom_index,
+                                         flavor);
+            }
+            else
+            {
+                /* TODO The execution time for pairs might be nice to account
+                   to its own subtimer, but first wallcycle needs to be
+                   extended to support calling from multiple threads. */
+                do_pairs(ftype,
+                         count,
+                         iatoms.data() + start,
+                         iparams.data(),
+                         x,
+                         f,
+                         fshift,
+                         pbc,
+                         lambda.data(),
+                         dvdl.data(),
+                         chargeA,
+                         chargeB,
+                         atomIsPerturbed,
+                         cENER,
+                         numEnergyGroups,
+                         fr_,
+                         perturbed,
+                         stepWork,
+                         grpp,
+                         global_atom_index);
+            }
+        }
     }
 
     if (thread == 0)
@@ -524,14 +563,14 @@ void ListedForces::calcBondedForces(const InteractionDefinitions& idef,
                 if (!ilist.empty() && ftype_is_bonded_potential(ftype))
                 {
                     ArrayRef<const int> iatoms = gmx::makeConstArrayRef(ilist.iatoms);
-                    const bool          havePerturbedInteractions =
-                            (idef.ilsort == ilsortFE_SORTED
-                             && idef.numNonperturbedInteractions[ftype] < idef.il[ftype].size());
+                    const int           numNonperturbedIatoms =
+                            (idef.ilsort == ilsortFE_SORTED ? idef.numNonperturbedInteractions[ftype]
+                                                            : ilist.size());
                     real v = calcOneBond(thread,
                                          ftype,
                                          idef,
                                          iatoms,
-                                         havePerturbedInteractions,
+                                         numNonperturbedIatoms,
                                          threading_->workDivision,
                                          x,
                                          ft,
@@ -694,13 +733,14 @@ void ListedForces::calcListedLambda(const InteractionDefinitions& idef,
                 workDivision.setBound(ftype, 1, iatomsPerturbed.ssize());
 
                 gmx::StepWorkload tempFlags;
-                tempFlags.computeEnergy              = true;
-                const bool havePerturbedInteractions = true;
-                real       v                         = calcOneBond(0,
+                tempFlags.computeEnergy = true;
+                // All interactions in iatomsPerturbed are perturbed
+                const int numNonperturbedIatoms = 0;
+                real      v                     = calcOneBond(0,
                                      ftype,
                                      idef,
                                      iatomsPerturbed,
-                                     havePerturbedInteractions,
+                                     numNonperturbedIatoms,
                                      workDivision,
                                      x,
                                      f,

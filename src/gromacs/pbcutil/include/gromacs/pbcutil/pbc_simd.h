@@ -100,6 +100,33 @@ static inline void gmx_simdcall pbc_correct_dx_simd(gmx::SimdReal* dx,
     *dx = *dx - shx * load<SimdReal>(pbc_simd + 8 * GMX_SIMD_REAL_WIDTH);  // load bxx
 }
 
+/*! \brief Correct SIMD distance vector *dx,*dy,*dz for PBC using SIMD and return the shifts.
+ *
+ * As pbc_correct_dx_simd(), but also returns the number of box vectors
+ * that were subtracted: on return dx = dx_in - sh[XX]*box[XX] - sh[YY]*box[YY] - sh[ZZ]*box[ZZ].
+ * This can be used to compute shift-force (virial) contributions in SIMD.
+ */
+static inline void gmx_simdcall pbc_correct_dx_simd(gmx::SimdReal* dx,
+                                                    gmx::SimdReal* dy,
+                                                    gmx::SimdReal* dz,
+                                                    const real*    pbc_simd,
+                                                    gmx::SimdReal  sh[DIM])
+{
+    using namespace gmx;
+
+    sh[ZZ] = round(*dz * load<SimdReal>(pbc_simd + 0 * GMX_SIMD_REAL_WIDTH));   // load inv_bzz
+    *dx    = *dx - sh[ZZ] * load<SimdReal>(pbc_simd + 1 * GMX_SIMD_REAL_WIDTH); // load bzx
+    *dy    = *dy - sh[ZZ] * load<SimdReal>(pbc_simd + 2 * GMX_SIMD_REAL_WIDTH); // load bzy
+    *dz    = *dz - sh[ZZ] * load<SimdReal>(pbc_simd + 3 * GMX_SIMD_REAL_WIDTH); // load bzz
+
+    sh[YY] = round(*dy * load<SimdReal>(pbc_simd + 4 * GMX_SIMD_REAL_WIDTH));   // load inv_byy
+    *dx    = *dx - sh[YY] * load<SimdReal>(pbc_simd + 5 * GMX_SIMD_REAL_WIDTH); // load byx
+    *dy    = *dy - sh[YY] * load<SimdReal>(pbc_simd + 6 * GMX_SIMD_REAL_WIDTH); // load byy
+
+    sh[XX] = round(*dx * load<SimdReal>(pbc_simd + 7 * GMX_SIMD_REAL_WIDTH));   // load inv_bxx
+    *dx    = *dx - sh[XX] * load<SimdReal>(pbc_simd + 8 * GMX_SIMD_REAL_WIDTH); // load bxx
+}
+
 /*! \brief Calculates the PBC corrected distance between SIMD coordinates.
  *
  * \param pbc_simd  SIMD formatted PBC information

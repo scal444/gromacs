@@ -131,14 +131,23 @@ real cmap_dihs(int                 nbonds,
                t_oriresdata gmx_unused* oriresdata,
                int gmx_unused*          global_atom_index);
 
-/*! \brief For selecting which flavor of bonded kernel is used for simple bonded types */
+/*! \brief For selecting which flavor of bonded kernel is used for simple bonded types
+ *
+ * The SimdWhenAvailable flavors use SIMD kernels for the interaction types that
+ * have them (bonds, angles, Urey-Bradley, proper/periodic improper and RB/Fourier
+ * dihedrals) and the corresponding non-SIMD flavor for all other types.
+ * The SIMD kernels only use the A-state parameters, so these flavors should not
+ * be used with perturbed interactions.
+ */
 enum class BondedKernelFlavor
 {
     ForcesSimdWhenAvailable, //!< Compute only forces, use SIMD when available; should not be used with perturbed parameters
-    ForcesNoSimd,             //!< Compute only forces, do not use SIMD
-    ForcesAndVirialAndEnergy, //!< Compute forces, virial and energy (no SIMD)
-    ForcesAndEnergy,          //!< Compute forces and energy (no SIMD)
-    Count                     //!< The number of flavors
+    ForcesNoSimd,                     //!< Compute only forces, do not use SIMD
+    ForcesAndVirialAndEnergy,         //!< Compute forces, virial, and energy (no SIMD)
+    ForcesAndEnergy,                  //!< Compute forces and energy (no SIMD)
+    ForcesAndEnergySimdWhenAvailable, //!< Compute forces and energy, use SIMD when available; should not be used with perturbed parameters
+    ForcesAndVirialAndEnergySimdWhenAvailable, //!< Compute forces, virial, and energy, use SIMD when available; should not be used with perturbed parameters
+    Count                                      //!< The number of flavors
 };
 
 //! Helper strings for human-readable messages
@@ -147,21 +156,30 @@ extern LIBGROMACS_EXPORT const gmx::EnumerationArray<BondedKernelFlavor, std::st
 /*! \brief Returns whether the energy should be computed */
 static constexpr bool computeEnergy(const BondedKernelFlavor flavor)
 {
-    return (flavor == BondedKernelFlavor::ForcesAndVirialAndEnergy
-            || flavor == BondedKernelFlavor::ForcesAndEnergy);
+    return (flavor == BondedKernelFlavor::ForcesAndVirialAndEnergy || flavor == BondedKernelFlavor::ForcesAndEnergy
+            || flavor == BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable
+            || flavor == BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable);
 }
 
 /*! \brief Returns whether the virial should be computed */
 static constexpr bool computeVirial(const BondedKernelFlavor flavor)
 {
-    return (flavor == BondedKernelFlavor::ForcesAndVirialAndEnergy);
+    return (flavor == BondedKernelFlavor::ForcesAndVirialAndEnergy
+            || flavor == BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable);
 }
 
 /*! \brief Returns whether the energy and/or virial should be computed */
 static constexpr bool computeEnergyOrVirial(const BondedKernelFlavor flavor)
 {
-    return (flavor == BondedKernelFlavor::ForcesAndVirialAndEnergy
-            || flavor == BondedKernelFlavor::ForcesAndEnergy);
+    return computeEnergy(flavor) || computeVirial(flavor);
+}
+
+/*! \brief Returns whether SIMD kernels should be used, when available, with this flavor */
+static constexpr bool useSimdWhenAvailable(const BondedKernelFlavor flavor)
+{
+    return (flavor == BondedKernelFlavor::ForcesSimdWhenAvailable
+            || flavor == BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable
+            || flavor == BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable);
 }
 
 /*! \brief Calculates bonded interactions for simple bonded types
