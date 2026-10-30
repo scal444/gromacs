@@ -1157,8 +1157,7 @@ void do_pairs(InteractionFunction                 ftype,
      * the virial from the PBC shifts along the box vectors, which does not work
      * with screw PBC.
      */
-    else if (usePlainLJ14 && fr.use_simd_kernels && numEnergyGroups == 1
-             && !(stepWork.computeVirial && fr.pbcType == PbcType::Screw))
+    else if (usePlainLJ14 && fr.use_simd_kernels && numEnergyGroups == 1 && fr.pbcType != PbcType::Screw)
     {
         alignas(GMX_SIMD_ALIGNMENT) real pbc_simd[9 * GMX_SIMD_REAL_WIDTH];
         set_pbc_simd(pbc, pbc_simd);

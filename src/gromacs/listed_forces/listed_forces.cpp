@@ -222,18 +222,18 @@ bool isPairInteraction(InteractionFunction ftype)
  *
  * \param[in] stepWork                   The step workload
  * \param[in] useSimdKernels             Whether to use SIMD kernels when available
- * \param[in] useSimdKernelsForVirial    Whether SIMD kernels can compute the virial
+ * \param[in] useSimdKernelsForEnergies  Whether to use SIMD kernels for energies and virial
  * \param[in] havePerturbedInteractions  Whether the interactions are perturbed
  */
 BondedKernelFlavor selectBondedKernelFlavor(const gmx::StepWorkload& stepWork,
                                             const bool               useSimdKernels,
-                                            const bool               useSimdKernelsForVirial,
+                                            const bool               useSimdKernelsForEnergies,
                                             const bool               havePerturbedInteractions)
 {
     BondedKernelFlavor flavor;
     if (stepWork.computeVirial)
     {
-        if (useSimdKernelsForVirial && !havePerturbedInteractions)
+        if (useSimdKernelsForEnergies && !havePerturbedInteractions)
         {
             flavor = BondedKernelFlavor::ForcesAndVirialAndEnergySimdWhenAvailable;
         }
@@ -244,7 +244,7 @@ BondedKernelFlavor selectBondedKernelFlavor(const gmx::StepWorkload& stepWork,
     }
     else if (stepWork.computeEnergy)
     {
-        if (useSimdKernels && !havePerturbedInteractions)
+        if (useSimdKernelsForEnergies && !havePerturbedInteractions)
         {
             flavor = BondedKernelFlavor::ForcesAndEnergySimdWhenAvailable;
         }
@@ -296,9 +296,10 @@ real ListedForces::calcOneBond(int                                 thread,
                "The topology should be marked either as no FE or sorted on FE");
 
     /* The SIMD kernels compute the virial through the PBC shifts along the box vectors,
-     * which does not work with screw PBC.
+     * which does not work with screw PBC. We use the plain-C kernels for all energy
+     * steps with screw PBC, as the SIMD PBC treatment ignores the screw.
      */
-    const bool useSimdKernelsForVirial = fr_.use_simd_kernels && fr_.pbcType != PbcType::Screw;
+    const bool useSimdKernelsForEnergies = fr_.use_simd_kernels && fr_.pbcType != PbcType::Screw;
 
     FreeEnergyPerturbationCouplingType efptFTYPE;
     if (IS_RESTRAINT_TYPE(ftype))
@@ -365,7 +366,7 @@ real ListedForces::calcOneBond(int                                 thread,
             if (!isPairInteraction(ftype))
             {
                 const BondedKernelFlavor flavor = selectBondedKernelFlavor(
-                        stepWork, fr_.use_simd_kernels, useSimdKernelsForVirial, perturbed);
+                        stepWork, fr_.use_simd_kernels, useSimdKernelsForEnergies, perturbed);
 
                 v += calculateSimpleBond(ftype,
                                          count,
