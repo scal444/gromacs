@@ -622,7 +622,8 @@ static inline SimdDouble gmx_simdcall round(SimdDouble x)
 
 static inline SimdDouble gmx_simdcall trunc(SimdDouble x)
 {
-    return cvtI2R(cvttR2I(x));
+    svbool_t pg = svptrue_b64();
+    return { svrintz_f64_x(pg, x.simdInternal_) };
 }
 
 static inline void gmx_simdcall cvtF2DD(SimdFloat gmx_unused   f,

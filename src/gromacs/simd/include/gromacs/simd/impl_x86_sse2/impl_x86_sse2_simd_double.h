@@ -302,7 +302,18 @@ static inline SimdDouble gmx_simdcall round(SimdDouble x)
 
 static inline SimdDouble gmx_simdcall trunc(SimdDouble x)
 {
-    return { _mm_cvtepi32_pd(_mm_cvttpd_epi32(x.simdInternal_)) };
+    // cvttpd2dq is only valid for |x| < 2^31, so convert each element via int64 instead.
+    // Every double with |x| >= 2^52 is already an integer, so for those (and for inf/NaN,
+    // where the compare is false) return x unchanged. OR-ing in the sign bit of x gives -0
+    // for e.g. trunc(-0.5), as std::trunc does.
+    const __m128d signBit = _mm_set1_pd(GMX_DOUBLE_NEGZERO);
+    const __m128d inRange =
+            _mm_cmplt_pd(_mm_andnot_pd(signBit, x.simdInternal_), _mm_set1_pd(4503599627370496.0));
+    const __m128d xHigh = _mm_unpackhi_pd(x.simdInternal_, x.simdInternal_);
+    __m128d t = _mm_unpacklo_pd(_mm_cvtsi64_sd(x.simdInternal_, _mm_cvttsd_si64(x.simdInternal_)),
+                                _mm_cvtsi64_sd(xHigh, _mm_cvttsd_si64(xHigh)));
+    t         = _mm_or_pd(t, _mm_and_pd(signBit, x.simdInternal_));
+    return { _mm_or_pd(_mm_and_pd(inRange, t), _mm_andnot_pd(inRange, x.simdInternal_)) };
 }
 
 #endif

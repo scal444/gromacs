@@ -630,7 +630,8 @@ static inline SimdFloat gmx_simdcall round(SimdFloat x)
 
 static inline SimdFloat gmx_simdcall trunc(SimdFloat x)
 {
-    return cvtI2R(cvttR2I(x));
+    svbool_t pg = svptrue_b32();
+    return { svrintz_f32_x(pg, x.simdInternal_) };
 }
 
 } // namespace gmx

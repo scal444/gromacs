@@ -191,7 +191,14 @@ static inline Simd4Float gmx_simdcall round(Simd4Float x)
 
 static inline Simd4Float gmx_simdcall trunc(Simd4Float x)
 {
-    return { _mm_cvtepi32_ps(_mm_cvttps_epi32(x.simdInternal_)) };
+    // cvttps2dq is only valid for |x| < 2^31. Every float with |x| >= 2^23 is already an
+    // integer, so for those (and for inf/NaN, where the compare is false) return x unchanged.
+    // OR-ing in the sign bit of x gives -0 for e.g. trunc(-0.5), as std::trunc does.
+    const __m128 signBit = _mm_set1_ps(GMX_FLOAT_NEGZERO);
+    const __m128 inRange = _mm_cmplt_ps(_mm_andnot_ps(signBit, x.simdInternal_), _mm_set1_ps(8388608.0F));
+    const __m128 t = _mm_or_ps(_mm_cvtepi32_ps(_mm_cvttps_epi32(x.simdInternal_)),
+                               _mm_and_ps(signBit, x.simdInternal_));
+    return { _mm_or_ps(_mm_and_ps(inRange, t), _mm_andnot_ps(inRange, x.simdInternal_)) };
 }
 
 static inline float gmx_simdcall dotProduct(Simd4Float a, Simd4Float b)
