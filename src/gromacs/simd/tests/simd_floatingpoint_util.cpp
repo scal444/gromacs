@@ -34,6 +34,8 @@
 #include "gmxpre.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 
 #include <numeric>
 #include <string>
@@ -50,6 +52,16 @@
 #include "testutils/testasserts.h"
 
 #include "simd.h"
+
+#if defined(__unix__) || defined(__APPLE__)
+#    include <unistd.h>
+
+#    include <sys/mman.h>
+#    include <sys/resource.h>
+#    define GMX_SIMD_TEST_HAVE_GUARD_PAGE 1
+#else
+#    define GMX_SIMD_TEST_HAVE_GUARD_PAGE 0
+#endif
 
 namespace gmx
 {
@@ -999,6 +1011,66 @@ TEST_F(SimdFloatingpointUtilTest, loadU4NOffset)
 }
 
 #    endif // GMX_SIMD_HAVE_4NSIMD_UTIL_REAL
+
+/*! \brief Calls transposeScatterIncrU<3> or DecrU<3> on a triplet that ends at an
+ * inaccessible page, then exits with 0 if the result is correct.
+ *
+ * Every SIMD element targets the same triplet. If the implementation touches
+ * memory beyond the three elements, the process gets a segmentation fault.
+ */
+#    if GMX_SIMD_TEST_HAVE_GUARD_PAGE && GTEST_HAS_DEATH_TEST
+void scatterIntoTripletBeforeGuardPage(bool increment)
+{
+    // Avoid writing a core file when the expected failure mode, a segmentation fault, occurs
+    const rlimit noCoreFile = { 0, 0 };
+    setrlimit(RLIMIT_CORE, &noCoreFile);
+
+    const long pageSize = sysconf(_SC_PAGESIZE);
+    void* mem = mmap(nullptr, 2 * pageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED || mprotect(static_cast<char*>(mem) + pageSize, pageSize, PROT_NONE) != 0)
+    {
+        std::exit(2);
+    }
+    real* triplet = reinterpret_cast<real*>(static_cast<char*>(mem) + pageSize) - 3;
+    triplet[0] = triplet[1] = triplet[2] = 1;
+
+    alignas(GMX_SIMD_ALIGNMENT) std::int32_t offset[GMX_SIMD_REAL_WIDTH] = { 0 };
+    const SimdReal                           v0(1), v1(2), v2(3);
+    if (increment)
+    {
+        transposeScatterIncrU<3>(triplet, offset, v0, v1, v2);
+    }
+    else
+    {
+        transposeScatterDecrU<3>(triplet, offset, v0, v1, v2);
+    }
+    const real sign = increment ? 1 : -1;
+    const bool ok   = (triplet[0] == 1 + sign * GMX_SIMD_REAL_WIDTH * 1
+                     && triplet[1] == 1 + sign * GMX_SIMD_REAL_WIDTH * 2
+                     && triplet[2] == 1 + sign * GMX_SIMD_REAL_WIDTH * 3);
+    std::exit(ok ? 0 : 1);
+}
+#    endif
+
+/* The documentation allows transposeScatterIncrU/DecrU to access memory beyond the last
+ * triplet when the caller provides padding, but no implementation does so for align < 4.
+ * Check this, so that callers with only one element of padding, or none, remain safe.
+ */
+TEST_F(SimdFloatingpointUtilTest, transposeScatterIncrDecrU3DoNotAccessBeyondTriplet)
+{
+#    if GMX_SIMD_TEST_HAVE_GUARD_PAGE && GTEST_HAS_DEATH_TEST
+    // The test binary may have started OpenMP threads, so do not use plain fork()
+    const std::string oldDeathTestStyle = GTEST_FLAG_GET(death_test_style);
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_EXIT(scatterIntoTripletBeforeGuardPage(true), ::testing::ExitedWithCode(0), "")
+            << "transposeScatterIncrU<3> accessed memory beyond the triplet, or gave wrong results";
+    EXPECT_EXIT(scatterIntoTripletBeforeGuardPage(false), ::testing::ExitedWithCode(0), "")
+            << "transposeScatterDecrU<3> accessed memory beyond the triplet, or gave wrong results";
+    GTEST_FLAG_SET(death_test_style, oldDeathTestStyle);
+#    else
+    GTEST_SKIP() << "Needs POSIX mmap/mprotect and death-test support";
+#    endif
+}
 
 #endif // GMX_SIMD_HAVE_REAL
 
