@@ -85,8 +85,8 @@ iprod(SimdFloat ax, SimdFloat ay, SimdFloat az, SimdFloat bx, SimdFloat by, Simd
     SimdFloat ret;
 
     ret = ax * bx;
-    ret = ay * by + ret;
-    ret = az * bz + ret;
+    ret = fma(ay, by, ret);
+    ret = fma(az, bz, ret);
 
     return ret;
 }
@@ -107,8 +107,8 @@ static inline SimdFloat gmx_simdcall norm2(SimdFloat ax, SimdFloat ay, SimdFloat
     SimdFloat ret;
 
     ret = ax * ax;
-    ret = ay * ay + ret;
-    ret = az * az + ret;
+    ret = fma(ay, ay, ret);
+    ret = fma(az, az, ret);
 
     return ret;
 }
@@ -172,8 +172,8 @@ iprod(SimdDouble ax, SimdDouble ay, SimdDouble az, SimdDouble bx, SimdDouble by,
     SimdDouble ret;
 
     ret = ax * bx;
-    ret = ay * by + ret;
-    ret = az * bz + ret;
+    ret = fma(ay, by, ret);
+    ret = fma(az, bz, ret);
 
     return ret;
 }
@@ -194,8 +194,8 @@ static inline SimdDouble gmx_simdcall norm2(SimdDouble ax, SimdDouble ay, SimdDo
     SimdDouble ret;
 
     ret = ax * ax;
-    ret = ay * ay + ret;
-    ret = az * az + ret;
+    ret = fma(ay, ay, ret);
+    ret = fma(az, az, ret);
 
     return ret;
 }
@@ -229,13 +229,13 @@ static inline void gmx_simdcall cprod(SimdDouble  ax,
                                       SimdDouble* cz)
 {
     *cx = ay * bz;
-    *cx = *cx - az * by;
+    *cx = fnma(az, by, *cx);
 
     *cy = az * bx;
-    *cy = *cy - ax * bz;
+    *cy = fnma(ax, bz, *cy);
 
     *cz = ax * by;
-    *cz = *cz - ay * bx;
+    *cz = fnma(ay, bx, *cz);
 }
 #        endif // GMX_SIMD_HAVE_DOUBLE
 
@@ -257,8 +257,8 @@ static inline Simd4Float gmx_simdcall norm2(Simd4Float ax, Simd4Float ay, Simd4F
     Simd4Float ret;
 
     ret = ax * ax;
-    ret = ay * ay + ret;
-    ret = az * az + ret;
+    ret = fma(ay, ay, ret);
+    ret = fma(az, az, ret);
 
     return ret;
 }
@@ -282,8 +282,8 @@ static inline Simd4Double gmx_simdcall norm2(Simd4Double ax, Simd4Double ay, Sim
     Simd4Double ret;
 
     ret = ax * ax;
-    ret = ay * ay + ret;
-    ret = az * az + ret;
+    ret = fma(ay, ay, ret);
+    ret = fma(az, az, ret);
 
     return ret;
 }
