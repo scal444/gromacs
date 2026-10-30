@@ -47,6 +47,7 @@ gmx_add_unit_test(EwaldUnitTests ewald-test
         pmegathertest.cpp
         pmesolvetest.cpp
         pmesplinespreadtest.cpp
+        pmesplinesetuptest.cpp
         pme.cpp
     GPU_CPP_SOURCE_FILES
         pmetestcommon.cpp
