@@ -48,13 +48,13 @@
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/vec.h"
 
 #include "pme_grid.h"
 #include "pme_internal.h"
 #include "pme_simd.h"
+#include "pme_spline_setup.h"
 #include "pme_spline_work.h"
-
-/* TODO consider split of pme-spline from this file */
 
 static void calc_interpolation_idx(const gmx_pme_t*  pme,
                                    PmeAtomComm*      atc,
@@ -63,97 +63,46 @@ static void calc_interpolation_idx(const gmx_pme_t*  pme,
                                    int               end,
                                    int               thread)
 {
-    int         i;
-    int *       idxptr, tix, tiy, tiz;
-    const real* xptr;
-    real *      fptr, tx, ty, tz;
-    real        rxx, ryx, ryy, rzx, rzy, rzz;
-    int         nx, ny, nz;
-    gmx_bool    bThreads;
-    int*        thread_idx = nullptr;
-    int*        tpl_n      = nullptr;
-    int         thread_i;
+    int* tpl_n = nullptr;
 
-    nx = pme->nkx;
-    ny = pme->nky;
-    nz = pme->nkz;
+    gmx::PmeInterpolationIndexLookup lookup;
+    lookup.numGridPoints = { pme->nkx, pme->nky, pme->nkz };
+    copy_mat(pme->unitCell.recipbox, lookup.recipbox);
+    lookup.gridIndexToLocalIndex = { pme->nnx, pme->nny, pme->nnz };
+    lookup.fractionShift         = { pme->fshx, pme->fshy };
 
-    rxx = pme->unitCell.recipbox[XX][XX];
-    ryx = pme->unitCell.recipbox[YY][XX];
-    ryy = pme->unitCell.recipbox[YY][YY];
-    rzx = pme->unitCell.recipbox[ZZ][XX];
-    rzy = pme->unitCell.recipbox[ZZ][YY];
-    rzz = pme->unitCell.recipbox[ZZ][ZZ];
-
-    const int* g2tx = pmeGrids.g2t[XX].data();
-    const int* g2ty = pmeGrids.g2t[YY].data();
-    const int* g2tz = pmeGrids.g2t[ZZ].data();
-
-    bThreads = (atc->nthread > 1);
+    const bool                   bThreads = (atc->nthread > 1);
+    gmx::PmeAtomThreadAssignment threadAssignment;
     if (bThreads)
     {
-        thread_idx = atc->thread_idx.data();
-
         tpl_n = atc->threadMap[thread].n;
-        for (i = 0; i < atc->nthread; i++)
+        for (int i = 0; i < atc->nthread; i++)
         {
             tpl_n[i] = 0;
         }
+
+        threadAssignment.gridToThread = { pmeGrids.g2t[XX].data(),
+                                          pmeGrids.g2t[YY].data(),
+                                          pmeGrids.g2t[ZZ].data() };
+        threadAssignment.threadIndex  = atc->thread_idx.data();
+        threadAssignment.threadCounts = tpl_n;
     }
 
-    const real shift = c_pmeMaxUnitcellShift;
-
-    for (i = start; i < end; i++)
-    {
-        xptr   = atc->x[i];
-        idxptr = atc->idx[i];
-        fptr   = atc->fractx[i];
-
-        /* Fractional coordinates along box vectors, add a positive shift to ensure tx/ty/tz are positive for triclinic boxes */
-        tx = nx * (xptr[XX] * rxx + xptr[YY] * ryx + xptr[ZZ] * rzx + shift);
-        ty = ny * (xptr[YY] * ryy + xptr[ZZ] * rzy + shift);
-        tz = nz * (xptr[ZZ] * rzz + shift);
-
-        tix = static_cast<int>(tx);
-        tiy = static_cast<int>(ty);
-        tiz = static_cast<int>(tz);
-
-#ifdef DEBUG
-        range_check(tix, 0, c_pmeNeighborUnitcellCount * nx);
-        range_check(tiy, 0, c_pmeNeighborUnitcellCount * ny);
-        range_check(tiz, 0, c_pmeNeighborUnitcellCount * nz);
-#endif
-        /* Because decomposition only occurs in x and y,
-         * we never have a fraction correction in z.
-         */
-        fptr[XX] = tx - tix + pme->fshx[tix];
-        fptr[YY] = ty - tiy + pme->fshy[tiy];
-        fptr[ZZ] = tz - tiz;
-
-        idxptr[XX] = pme->nnx[tix];
-        idxptr[YY] = pme->nny[tiy];
-        idxptr[ZZ] = pme->nnz[tiz];
-
-#ifdef DEBUG
-        range_check(idxptr[XX], 0, pme->pmegrid_nx);
-        range_check(idxptr[YY], 0, pme->pmegrid_ny);
-        range_check(idxptr[ZZ], 0, pme->pmegrid_nz);
-#endif
-
-        if (bThreads)
-        {
-            thread_i      = g2tx[idxptr[XX]] + g2ty[idxptr[YY]] + g2tz[idxptr[ZZ]];
-            thread_idx[i] = thread_i;
-            tpl_n[thread_i]++;
-        }
-    }
+    gmx::pmeCalcInterpolationIndices(lookup,
+                                     atc->x,
+                                     start,
+                                     end,
+                                     atc->fractx,
+                                     atc->idx,
+                                     bThreads ? &threadAssignment : nullptr,
+                                     gmx::c_pmeSplineSetupKernelDefault);
 
     if (bThreads)
     {
         /* Make a list of particle indices sorted on thread */
 
         /* Get the cumulative count */
-        for (i = 1; i < atc->nthread; i++)
+        for (int i = 1; i < atc->nthread; i++)
         {
             tpl_n[i] += tpl_n[i - 1];
         }
@@ -164,14 +113,14 @@ static void calc_interpolation_idx(const gmx_pme_t*  pme,
         AtomToThreadMap& threadMap = atc->threadMap[thread];
         threadMap.i.resize(tpl_n[atc->nthread - 1]);
         /* Set tpl_n to the cumulative start */
-        for (i = atc->nthread - 1; i >= 1; i--)
+        for (int i = atc->nthread - 1; i >= 1; i--)
         {
             tpl_n[i] = tpl_n[i - 1];
         }
         tpl_n[0] = 0;
 
         /* Fill our thread local array with indices sorted on thread */
-        for (i = start; i < end; i++)
+        for (int i = start; i < end; i++)
         {
             threadMap.i[tpl_n[atc->thread_idx[i]]++] = i;
         }
@@ -209,96 +158,6 @@ static void make_thread_local_ind(const PmeAtomComm* atc, int thread, splinedata
 // indexing out of bounds does not occur. However compilers don't
 // always understand that, so we suppress this warning for this code
 // region.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-
-/* Macro to force loop unrolling by fixing order.
- * This gives a significant performance gain.
- */
-#define CALC_SPLINE(order)                                                                       \
-    {                                                                                            \
-        for (int j = 0; (j < DIM); j++)                                                          \
-        {                                                                                        \
-            real dr, div;                                                                        \
-            real data[PME_ORDER_MAX];                                                            \
-                                                                                                 \
-            dr = xptr[j];                                                                        \
-                                                                                                 \
-            /* dr is relative offset from lower cell limit */                                    \
-            data[(order) - 1] = 0;                                                               \
-            data[1]           = dr;                                                              \
-            data[0]           = 1 - dr;                                                          \
-                                                                                                 \
-            for (int k = 3; (k < (order)); k++)                                                  \
-            {                                                                                    \
-                div         = 1.0 / (k - 1.0);                                                   \
-                data[k - 1] = div * dr * data[k - 2];                                            \
-                for (int l = 1; (l < (k - 1)); l++)                                              \
-                {                                                                                \
-                    data[k - l - 1] =                                                            \
-                            div * ((dr + l) * data[k - l - 2] + (k - l - dr) * data[k - l - 1]); \
-                }                                                                                \
-                data[0] = div * (1 - dr) * data[0];                                              \
-            }                                                                                    \
-            /* differentiate */                                                                  \
-            dtheta[j][i * (order) + 0] = -data[0];                                               \
-            for (int k = 1; (k < (order)); k++)                                                  \
-            {                                                                                    \
-                dtheta[j][i * (order) + k] = data[k - 1] - data[k];                              \
-            }                                                                                    \
-                                                                                                 \
-            div               = 1.0 / ((order) - 1);                                             \
-            data[(order) - 1] = div * dr * data[(order) - 2];                                    \
-            for (int l = 1; (l < ((order) - 1)); l++)                                            \
-            {                                                                                    \
-                data[(order) - l - 1] = div                                                      \
-                                        * ((dr + l) * data[(order) - l - 2]                      \
-                                           + ((order) - l - dr) * data[(order) - l - 1]);        \
-            }                                                                                    \
-            data[0] = div * (1 - dr) * data[0];                                                  \
-                                                                                                 \
-            for (int k = 0; k < (order); k++)                                                    \
-            {                                                                                    \
-                theta[j][i * (order) + k] = data[k];                                             \
-            }                                                                                    \
-        }                                                                                        \
-    }
-
-static void make_bsplines(gmx::ArrayRef<real*> theta,
-                          gmx::ArrayRef<real*> dtheta,
-                          int                  order,
-                          rvec                 fractx[],
-                          int                  nr,
-                          const int            ind[],
-                          const real           coefficient[],
-                          const bool           computeAllSplineCoefficients)
-{
-    /* construct splines for local atoms */
-    int   i, ii;
-    real* xptr;
-
-    for (i = 0; i < nr; i++)
-    {
-        /* With free energy we do not use the coefficient check.
-         * In most cases this will be more efficient than calling make_bsplines
-         * twice, since usually more than half the particles have non-zero coefficients.
-         */
-        ii = ind[i];
-        if (computeAllSplineCoefficients || coefficient[ii] != 0.0)
-        {
-            xptr = fractx[ii];
-            assert(order >= 3 && order <= PME_ORDER_MAX);
-            switch (order)
-            {
-                case 4: CALC_SPLINE(4) break;
-                case 5: CALC_SPLINE(5) break;
-                default: CALC_SPLINE(order) break;
-            }
-        }
-    }
-}
-
-#pragma GCC diagnostic pop
 
 /* This has to be a macro to enable full compiler optimization with xlC (and probably others too) */
 #define DO_BSPLINE(order)                             \
@@ -971,14 +830,15 @@ void spread_on_grid(const gmx_pme_t* pme,
 
             if (calculateSplines)
             {
-                make_bsplines(spline->theta.coefficients,
-                              spline->dtheta.coefficients,
-                              pme->pme_order,
-                              as_rvec_array(atc->fractx.data()),
-                              spline->n,
-                              spline->ind.data(),
-                              atc->coefficient.data(),
-                              computeAllSplineCoefficients);
+                gmx::pmeMakeBsplines(spline->theta.coefficients,
+                                     spline->dtheta.coefficients,
+                                     pme->pme_order,
+                                     atc->fractx,
+                                     spline->n,
+                                     spline->ind.data(),
+                                     atc->coefficient.data(),
+                                     computeAllSplineCoefficients,
+                                     gmx::c_pmeSplineSetupKernelDefault);
             }
 
             if (doSpreading)

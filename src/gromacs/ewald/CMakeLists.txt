@@ -46,6 +46,7 @@ gmx_add_libgromacs_sources(
     pme_pp.cpp
     pme_redistribute.cpp
     pme_solve.cpp
+    pme_spline_setup.cpp
     pme_spline_work.cpp
     pme_spread.cpp
     pme_gpu_program.cpp
