@@ -126,13 +126,6 @@ static inline SimdFloat gmx_simdcall simdLoad(const float* m, SimdFloatTag = {})
     return { svld1_f32(pg, m) };
 }
 
-static inline SimdFloat gmx_simdcall simdLoad(SimdFloat* m, int offset, SimdFloatTag = {})
-{
-    assert(0 == (std::size_t(m) % GMX_SIMD_ALIGNMENT));
-    svbool_t pg = svptrue_b32();
-    return { svld1_f32(pg, reinterpret_cast<float*>(m) + offset * svcntw()) };
-}
-
 static inline SimdFloat gmx_simdcall simdLoadFloat(const float* m)
 {
     assert(0 == (std::size_t(m) % GMX_SIMD_ALIGNMENT));
@@ -162,11 +155,6 @@ static inline void gmx_simdcall storeU(float* m, SimdFloat a)
 static inline SimdFloat gmx_simdcall setZeroF()
 {
     return { svdup_n_f32(0.0f) };
-}
-
-static inline void gmx_simdcall simdIncr(SimdFloat*& p, SimdFloatTag)
-{
-    p = reinterpret_cast<SimdFloat*>(reinterpret_cast<uint64_t>(p) + svcntw());
 }
 
 static inline SimdFInt32 gmx_simdcall simdLoad(const std::int32_t* m, SimdFInt32Tag)

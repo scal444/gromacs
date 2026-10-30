@@ -126,13 +126,6 @@ static inline SimdDouble gmx_simdcall simdLoad(const double* m, SimdDoubleTag = 
     return { svld1_f64(pg, m) };
 }
 
-static inline SimdDouble gmx_simdcall simdLoad(SimdDouble* m, int offset, SimdDoubleTag = {})
-{
-    assert(0 == (std::size_t(m) % GMX_SIMD_ALIGNMENT));
-    svbool_t pg = svptrue_b64();
-    return { svld1_f64(pg, reinterpret_cast<double*>(m) + offset * svcntd()) };
-}
-
 static inline SimdDouble gmx_simdcall simdLoadDouble(const double* m)
 {
     assert(0 == (std::size_t(m) % GMX_SIMD_ALIGNMENT));
