@@ -154,6 +154,15 @@ static inline void gmx_simdcall transposeScatterStoreU(double*            base,
     _mm512_i32scatter_pd(&(base[2]), simdoffset.simdInternal_, v2.simdInternal_, scale);
 }
 
+/*! \brief Load three doubles into the low elements of an __m256d, upper element zero.
+ *
+ * Unlike _mm256_loadu_pd this never reads m[3], so it is safe at the end of an unpadded buffer.
+ */
+static inline __m256d gmx_simdcall loadU3Double(const double* m)
+{
+    return _mm512_castpd512_pd256(_mm512_maskz_loadu_pd(avx512Int2Mask(7), m));
+}
+
 template<int align>
 static inline void gmx_simdcall
 transposeScatterIncrU(double* base, const std::int32_t offset[], SimdDouble v0, SimdDouble v1, SimdDouble v2)
@@ -179,13 +188,12 @@ transposeScatterIncrU(double* base, const std::int32_t offset[], SimdDouble v0, 
         {
             _mm512_mask_storeu_pd(base + o[0 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castpd256_pd512(_mm256_add_pd(_mm256_loadu_pd(base + o[0 + i]),
+                                  _mm512_castpd256_pd512(_mm256_add_pd(loadU3Double(base + o[0 + i]),
                                                                        _mm512_castpd512_pd256(t[i]))));
-            _mm512_mask_storeu_pd(
-                    base + o[4 + i],
-                    avx512Int2Mask(7),
-                    _mm512_castpd256_pd512(_mm256_add_pd(_mm256_loadu_pd(base + o[4 + i]),
-                                                         _mm512_extractf64x4_pd(t[i], 1))));
+            _mm512_mask_storeu_pd(base + o[4 + i],
+                                  avx512Int2Mask(7),
+                                  _mm512_castpd256_pd512(_mm256_add_pd(loadU3Double(base + o[4 + i]),
+                                                                       _mm512_extractf64x4_pd(t[i], 1))));
         }
     }
     else
@@ -242,13 +250,12 @@ transposeScatterDecrU(double* base, const std::int32_t offset[], SimdDouble v0, 
         {
             _mm512_mask_storeu_pd(base + o[0 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castpd256_pd512(_mm256_sub_pd(_mm256_loadu_pd(base + o[0 + i]),
+                                  _mm512_castpd256_pd512(_mm256_sub_pd(loadU3Double(base + o[0 + i]),
                                                                        _mm512_castpd512_pd256(t[i]))));
-            _mm512_mask_storeu_pd(
-                    base + o[4 + i],
-                    avx512Int2Mask(7),
-                    _mm512_castpd256_pd512(_mm256_sub_pd(_mm256_loadu_pd(base + o[4 + i]),
-                                                         _mm512_extractf64x4_pd(t[i], 1))));
+            _mm512_mask_storeu_pd(base + o[4 + i],
+                                  avx512Int2Mask(7),
+                                  _mm512_castpd256_pd512(_mm256_sub_pd(loadU3Double(base + o[4 + i]),
+                                                                       _mm512_extractf64x4_pd(t[i], 1))));
         }
     }
     else

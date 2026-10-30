@@ -152,6 +152,15 @@ transposeScatterStoreU(float* base, const std::int32_t offset[], SimdFloat v0, S
     _mm512_i32scatter_ps(&(base[2]), simdoffset.simdInternal_, v2.simdInternal_, scale);
 }
 
+/*! \brief Load three floats into the low elements of an __m128, upper element zero.
+ *
+ * Unlike _mm_loadu_ps this never reads m[3], so it is safe at the end of an unpadded buffer.
+ */
+static inline __m128 gmx_simdcall loadU3Float(const float* m)
+{
+    return _mm512_castps512_ps128(_mm512_maskz_loadu_ps(avx512Int2Mask(7), m));
+}
+
 template<int align>
 static inline void gmx_simdcall
 transposeScatterIncrU(float* base, const std::int32_t offset[], SimdFloat v0, SimdFloat v1, SimdFloat v2)
@@ -172,19 +181,19 @@ transposeScatterIncrU(float* base, const std::int32_t offset[], SimdFloat v0, Si
         {
             _mm512_mask_storeu_ps(base + o[i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_add_ps(_mm_loadu_ps(base + o[i]),
+                                  _mm512_castps128_ps512(_mm_add_ps(loadU3Float(base + o[i]),
                                                                     _mm512_castps512_ps128(t[i]))));
             _mm512_mask_storeu_ps(base + o[4 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_add_ps(_mm_loadu_ps(base + o[4 + i]),
+                                  _mm512_castps128_ps512(_mm_add_ps(loadU3Float(base + o[4 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 1))));
             _mm512_mask_storeu_ps(base + o[8 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_add_ps(_mm_loadu_ps(base + o[8 + i]),
+                                  _mm512_castps128_ps512(_mm_add_ps(loadU3Float(base + o[8 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 2))));
             _mm512_mask_storeu_ps(base + o[12 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_add_ps(_mm_loadu_ps(base + o[12 + i]),
+                                  _mm512_castps128_ps512(_mm_add_ps(loadU3Float(base + o[12 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 3))));
         }
     }
@@ -250,19 +259,19 @@ transposeScatterDecrU(float* base, const std::int32_t offset[], SimdFloat v0, Si
         {
             _mm512_mask_storeu_ps(base + o[i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_sub_ps(_mm_loadu_ps(base + o[i]),
+                                  _mm512_castps128_ps512(_mm_sub_ps(loadU3Float(base + o[i]),
                                                                     _mm512_castps512_ps128(t[i]))));
             _mm512_mask_storeu_ps(base + o[4 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_sub_ps(_mm_loadu_ps(base + o[4 + i]),
+                                  _mm512_castps128_ps512(_mm_sub_ps(loadU3Float(base + o[4 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 1))));
             _mm512_mask_storeu_ps(base + o[8 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_sub_ps(_mm_loadu_ps(base + o[8 + i]),
+                                  _mm512_castps128_ps512(_mm_sub_ps(loadU3Float(base + o[8 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 2))));
             _mm512_mask_storeu_ps(base + o[12 + i],
                                   avx512Int2Mask(7),
-                                  _mm512_castps128_ps512(_mm_sub_ps(_mm_loadu_ps(base + o[12 + i]),
+                                  _mm512_castps128_ps512(_mm_sub_ps(loadU3Float(base + o[12 + i]),
                                                                     _mm512_extractf32x4_ps(t[i], 3))));
         }
     }
