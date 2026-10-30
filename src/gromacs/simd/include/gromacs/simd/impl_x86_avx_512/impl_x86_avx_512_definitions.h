@@ -96,4 +96,16 @@
 #define GMX_SIMD_RSQRT_BITS 14
 #define GMX_SIMD_RCP_BITS 14
 
+/* The gather/scatter-style transposes in the util headers (gatherLoad*Transpose*,
+ * transposeScatterStoreU, loadU4NOffset) are by default implemented with contiguous
+ * 64/128/256-bit loads or masked stores plus in-register permutes, like the AVX_256
+ * implementation. Define this to 1 to use the AVX-512 hardware gather/scatter
+ * instructions instead (the previous implementation), e.g. for A/B benchmarking.
+ * Hardware gathers are microcoded on AMD Zen4/Zen5 and slowed down by the Gather
+ * Data Sampling (Downfall) microcode mitigation on Intel Skylake-SP to Ice Lake.
+ */
+#ifndef GMX_SIMD_X86_AVX_512_USE_HW_GATHER
+#    define GMX_SIMD_X86_AVX_512_USE_HW_GATHER 0
+#endif
+
 #endif // GMX_SIMD_IMPL_X86_AVX_512_DEFINITIONS_H

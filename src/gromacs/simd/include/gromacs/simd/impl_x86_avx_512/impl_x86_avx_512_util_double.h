@@ -42,6 +42,7 @@
 #include <cassert>
 #include <cstdint>
 
+#include "gromacs/simd/impl_x86_avx_512/impl_x86_avx_512_definitions.h"
 #include "gromacs/simd/impl_x86_avx_512/impl_x86_avx_512_general.h"
 #include "gromacs/simd/impl_x86_avx_512/impl_x86_avx_512_simd_double.h"
 #include "gromacs/utility/basedefinitions.h"
@@ -78,10 +79,128 @@ static inline SimdDInt32 fastMultiply(SimdDInt32 x)
 }
 
 template<int align>
-static inline void gmx_simdcall gatherLoadBySimdIntTranspose(const double*, SimdDInt32)
+static inline void gmx_simdcall avx512HwGatherTranspose(const double*, SimdDInt32)
 {
     // Nothing to do. Termination of recursion.
 }
+
+// Hardware-gather implementation: one 8-element gather per output.
+template<int align, typename... Targs>
+static inline void gmx_simdcall
+avx512HwGatherTranspose(const double* base, SimdDInt32 offset, SimdDouble* v, Targs... Fargs)
+{
+    if (align > 1)
+    {
+        offset = fastMultiply<align>(offset);
+    }
+    constexpr size_t scale = sizeof(double);
+    v->simdInternal_       = _mm512_i32gather_pd(offset.simdInternal_, base, scale);
+    avx512HwGatherTranspose<1>(base + 1, offset, Fargs...);
+}
+
+#if !GMX_SIMD_X86_AVX_512_USE_HW_GATHER
+/* Load-and-permute replacements for the hardware gathers, see the float version.
+ * With three outputs four doubles are loaded per point, which is only done when the
+ * fourth element lies within the same record (align >= 4) or for the "U" functions.
+ */
+template<int nOut, int align, bool unalignedVariant>
+static constexpr bool c_avx512UsePermuteTransposeDouble =
+        (nOut == 2 || nOut == 4 || (nOut == 3 && (align >= 4 || unalignedVariant)));
+
+// The pairs (2 doubles) at base + align*o[0..3], in order, as x0 y0 x1 y1 x2 y2 x3 y3.
+template<int align>
+static inline __m512d gmx_simdcall avx512LoadPairs4(const double* base, const std::int32_t* o)
+{
+    __m512 r = _mm512_castps128_ps512(_mm_castpd_ps(_mm_loadu_pd(base + align * o[0])));
+    r        = _mm512_insertf32x4(r, _mm_castpd_ps(_mm_loadu_pd(base + align * o[1])), 1);
+    r        = _mm512_insertf32x4(r, _mm_castpd_ps(_mm_loadu_pd(base + align * o[2])), 2);
+    r        = _mm512_insertf32x4(r, _mm_castpd_ps(_mm_loadu_pd(base + align * o[3])), 3);
+    return _mm512_castps_pd(r);
+}
+
+static inline void gmx_simdcall avx512DeinterleavePairs(__m512d a, __m512d b, __m512d* v0, __m512d* v1)
+{
+    *v0 = _mm512_permutex2var_pd(a, _mm512_setr_epi64(0, 2, 4, 6, 8, 10, 12, 14), b);
+    *v1 = _mm512_permutex2var_pd(a, _mm512_setr_epi64(1, 3, 5, 7, 9, 11, 13, 15), b);
+}
+
+template<int align>
+static inline void gmx_simdcall
+avx512LoadTranspose(const double* base, const std::int32_t* o, SimdDouble* v0, SimdDouble* v1)
+{
+    avx512DeinterleavePairs(avx512LoadPairs4<align>(base, o),
+                            avx512LoadPairs4<align>(base, o + 4),
+                            &v0->simdInternal_,
+                            &v1->simdInternal_);
+}
+
+/* Loads 4 doubles for each of the 8 points into r[j] = { point j | point j+2 } for j = 0,1
+ * and r[j] = { point j+2 | point j+4 } for j = 2,3, i.e. r0 = {p0|p2}, r1 = {p1|p3},
+ * r2 = {p4|p6}, r3 = {p5|p7}. After unpacking within 128-bit lanes, a single
+ * vshuff64x2 per output puts the 128-bit pieces in point order.
+ */
+template<int align, int nOut>
+static inline void gmx_simdcall avx512LoadTransposeQuads(const double* base, const std::int32_t* o, __m512d* v)
+{
+    auto load2 = [&](int a, int b) {
+        return _mm512_insertf64x4(
+                _mm512_castpd256_pd512(_mm256_loadu_pd(base + align * o[a])), _mm256_loadu_pd(base + align * o[b]), 1);
+    };
+    const __m512d r0 = load2(0, 2);
+    const __m512d r1 = load2(1, 3);
+    const __m512d r2 = load2(4, 6);
+    const __m512d r3 = load2(5, 7);
+    const __m512d t0 = _mm512_unpacklo_pd(r0, r1); // x0 x1 z0 z1 | x2 x3 z2 z3
+    const __m512d t1 = _mm512_unpackhi_pd(r0, r1); // y0 y1 w0 w1 | y2 y3 w2 w3
+    const __m512d t2 = _mm512_unpacklo_pd(r2, r3); // x4 x5 z4 z5 | x6 x7 z6 z7
+    const __m512d t3 = _mm512_unpackhi_pd(r2, r3); // y4 y5 w4 w5 | y6 y7 w6 w7
+    v[0]             = _mm512_shuffle_f64x2(t0, t2, _MM_SHUFFLE(2, 0, 2, 0));
+    v[1]             = _mm512_shuffle_f64x2(t1, t3, _MM_SHUFFLE(2, 0, 2, 0));
+    v[2]             = _mm512_shuffle_f64x2(t0, t2, _MM_SHUFFLE(3, 1, 3, 1));
+    if constexpr (nOut == 4)
+    {
+        v[3] = _mm512_shuffle_f64x2(t1, t3, _MM_SHUFFLE(3, 1, 3, 1));
+    }
+}
+
+template<int align>
+static inline void gmx_simdcall
+avx512LoadTranspose(const double* base, const std::int32_t* o, SimdDouble* v0, SimdDouble* v1, SimdDouble* v2)
+{
+    __m512d v[3];
+    avx512LoadTransposeQuads<align, 3>(base, o, v);
+    v0->simdInternal_ = v[0];
+    v1->simdInternal_ = v[1];
+    v2->simdInternal_ = v[2];
+}
+
+template<int align>
+static inline void gmx_simdcall avx512LoadTranspose(const double*       base,
+                                                    const std::int32_t* o,
+                                                    SimdDouble*         v0,
+                                                    SimdDouble*         v1,
+                                                    SimdDouble*         v2,
+                                                    SimdDouble*         v3)
+{
+    __m512d v[4];
+    avx512LoadTransposeQuads<align, 4>(base, o, v);
+    v0->simdInternal_ = v[0];
+    v1->simdInternal_ = v[1];
+    v2->simdInternal_ = v[2];
+    v3->simdInternal_ = v[3];
+}
+
+// Store the first 3 doubles of 256-bit half 'half' of a to p, leaving p[3] untouched.
+template<int half>
+static inline void gmx_simdcall avx512StoreHalf3(double* p, __m512d a)
+{
+#    if defined(__AVX512VL__)
+    _mm256_mask_storeu_pd(p, 0x7, half == 0 ? _mm512_castpd512_pd256(a) : _mm512_extractf64x4_pd(a, 1));
+#    else
+    _mm512_mask_storeu_pd(p, 0x7, half == 0 ? a : _mm512_castpd256_pd512(_mm512_extractf64x4_pd(a, 1)));
+#    endif
+}
+#endif // !GMX_SIMD_X86_AVX_512_USE_HW_GATHER
 
 /* This is an internal helper function used by decr3Hsimd(...).
  */
@@ -100,38 +219,69 @@ inline void gmx_simdcall decrHsimd(double* m, SimdDouble a)
 } // namespace
 
 
+namespace
+{
+template<int align, bool unalignedVariant, typename... Targs>
+static inline void gmx_simdcall
+avx512GatherLoadBySimdIntTranspose(const double* base, SimdDInt32 offset, SimdDouble* v, Targs... Fargs)
+{
+#if !GMX_SIMD_X86_AVX_512_USE_HW_GATHER
+    if constexpr (c_avx512UsePermuteTransposeDouble<1 + sizeof...(Targs), align, unalignedVariant>)
+    {
+        alignas(GMX_SIMD_ALIGNMENT) std::int32_t o[GMX_SIMD_DINT32_WIDTH];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(o), offset.simdInternal_);
+        avx512LoadTranspose<align>(base, o, v, Fargs...);
+    }
+    else
+#endif
+    {
+        avx512HwGatherTranspose<align>(base, offset, v, Fargs...);
+    }
+}
+
+template<int align, bool unalignedVariant, typename... Targs>
+static inline void gmx_simdcall
+avx512GatherLoadTranspose(const double* base, const std::int32_t offset[], SimdDouble* v, Targs... Fargs)
+{
+#if !GMX_SIMD_X86_AVX_512_USE_HW_GATHER
+    if constexpr (c_avx512UsePermuteTransposeDouble<1 + sizeof...(Targs), align, unalignedVariant>)
+    {
+        avx512LoadTranspose<align>(base, offset, v, Fargs...);
+    }
+    else
+#endif
+    {
+        avx512HwGatherTranspose<align>(base, simdLoad(offset, SimdDInt32Tag()), v, Fargs...);
+    }
+}
+} // namespace
+
 template<int align, typename... Targs>
 static inline void gmx_simdcall
 gatherLoadBySimdIntTranspose(const double* base, SimdDInt32 offset, SimdDouble* v, Targs... Fargs)
 {
-    if (align > 1)
-    {
-        offset = fastMultiply<align>(offset);
-    }
-    constexpr size_t scale = sizeof(double);
-    v->simdInternal_       = _mm512_i32gather_pd(offset.simdInternal_, base, scale);
-    gatherLoadBySimdIntTranspose<1>(base + 1, offset, Fargs...);
+    avx512GatherLoadBySimdIntTranspose<align, false>(base, offset, v, Fargs...);
 }
 
 template<int align, typename... Targs>
 static inline void gmx_simdcall
 gatherLoadUBySimdIntTranspose(const double* base, SimdDInt32 offset, SimdDouble* v, Targs... Fargs)
 {
-    gatherLoadBySimdIntTranspose<align>(base, offset, v, Fargs...);
+    avx512GatherLoadBySimdIntTranspose<align, true>(base, offset, v, Fargs...);
 }
 
 template<int align, typename... Targs>
 static inline void gmx_simdcall
 gatherLoadTranspose(const double* base, const std::int32_t offset[], SimdDouble* v, Targs... Fargs)
 {
-    gatherLoadBySimdIntTranspose<align>(base, simdLoad(offset, SimdDInt32Tag()), v, Fargs...);
+    avx512GatherLoadTranspose<align, false>(base, offset, v, Fargs...);
 }
 
 template<int align, typename... Targs>
 static inline void gmx_simdcall
 gatherLoadUTranspose(const double* base, const std::int32_t offset[], SimdDouble* v, Targs... Fargs)
 {
-    gatherLoadBySimdIntTranspose<align>(base, simdLoad(offset, SimdDInt32Tag()), v, Fargs...);
+    avx512GatherLoadTranspose<align, true>(base, offset, v, Fargs...);
 }
 
 template<int align>
@@ -141,6 +291,7 @@ static inline void gmx_simdcall transposeScatterStoreU(double*            base,
                                                        SimdDouble         v1,
                                                        SimdDouble         v2)
 {
+#if GMX_SIMD_X86_AVX_512_USE_HW_GATHER
     SimdDInt32 simdoffset = simdLoad(offset, SimdDInt32Tag());
 
     if (align > 1)
@@ -152,6 +303,28 @@ static inline void gmx_simdcall transposeScatterStoreU(double*            base,
     _mm512_i32scatter_pd(base, simdoffset.simdInternal_, v0.simdInternal_, scale);
     _mm512_i32scatter_pd(&(base[1]), simdoffset.simdInternal_, v1.simdInternal_, scale);
     _mm512_i32scatter_pd(&(base[2]), simdoffset.simdInternal_, v2.simdInternal_, scale);
+#else
+    // q[j] = { x_j y_j z_j z_j | x_{j+4} y_{j+4} z_{j+4} z_{j+4} }, then masked 3-element stores
+    // in index order (duplicate offsets: last one wins, as with the scatter).
+    const __m512d t0 = _mm512_unpacklo_pd(v0.simdInternal_, v1.simdInternal_); // x0 y0 x2 y2 x4 y4 x6 y6
+    const __m512d t1 = _mm512_unpackhi_pd(v0.simdInternal_, v1.simdInternal_); // x1 y1 x3 y3 x5 y5 x7 y7
+    const __m512d q0 =
+            _mm512_permutex2var_pd(t0, _mm512_setr_epi64(0, 1, 8, 8, 4, 5, 12, 12), v2.simdInternal_);
+    const __m512d q1 =
+            _mm512_permutex2var_pd(t1, _mm512_setr_epi64(0, 1, 9, 9, 4, 5, 13, 13), v2.simdInternal_);
+    const __m512d q2 =
+            _mm512_permutex2var_pd(t0, _mm512_setr_epi64(2, 3, 10, 10, 6, 7, 14, 14), v2.simdInternal_);
+    const __m512d q3 =
+            _mm512_permutex2var_pd(t1, _mm512_setr_epi64(2, 3, 11, 11, 6, 7, 15, 15), v2.simdInternal_);
+    avx512StoreHalf3<0>(base + align * offset[0], q0);
+    avx512StoreHalf3<0>(base + align * offset[1], q1);
+    avx512StoreHalf3<0>(base + align * offset[2], q2);
+    avx512StoreHalf3<0>(base + align * offset[3], q3);
+    avx512StoreHalf3<1>(base + align * offset[4], q0);
+    avx512StoreHalf3<1>(base + align * offset[5], q1);
+    avx512StoreHalf3<1>(base + align * offset[6], q2);
+    avx512StoreHalf3<1>(base + align * offset[7], q3);
+#endif
 }
 
 template<int align>
@@ -390,17 +563,26 @@ static inline void gmx_simdcall gatherLoadTransposeHsimd(const double*      base
                                                          SimdDouble*        v0,
                                                          SimdDouble*        v1)
 {
-    __m128i idx0, idx1;
-    __m256i idx;
-    __m512d tmp1, tmp2;
-
     assert(std::size_t(offset) % 16 == 0);
     assert(std::size_t(base0) % 16 == 0);
     assert(std::size_t(base1) % 16 == 0);
 
+    static_assert(align == 2 || align == 4, "If more are needed use fastMultiply");
+
+#if !GMX_SIMD_X86_AVX_512_USE_HW_GATHER
+    // 4 pairs from each base with 128-bit loads, then one two-source permute per output:
+    // v0 = { base0[align*offset[0..3]], base1[align*offset[0..3]] }, v1 likewise for +1.
+    avx512DeinterleavePairs(avx512LoadPairs4<align>(base0, offset),
+                            avx512LoadPairs4<align>(base1, offset),
+                            &v0->simdInternal_,
+                            &v1->simdInternal_);
+#else
+    __m128i idx0, idx1;
+    __m256i idx;
+    __m512d tmp1, tmp2;
+
     idx0 = _mm_load_si128(reinterpret_cast<const __m128i*>(offset));
 
-    static_assert(align == 2 || align == 4, "If more are needed use fastMultiply");
     idx0 = _mm_slli_epi32(idx0, align == 2 ? 1 : 2);
 
     idx1 = _mm_add_epi32(idx0, _mm_set1_epi32(1));
@@ -413,6 +595,7 @@ static inline void gmx_simdcall gatherLoadTransposeHsimd(const double*      base
 
     v0->simdInternal_ = _mm512_shuffle_f64x2(tmp1, tmp2, 0x44);
     v1->simdInternal_ = _mm512_shuffle_f64x2(tmp1, tmp2, 0xEE);
+#endif
 }
 
 static inline double gmx_simdcall reduceIncr4ReturnSumHsimd(double* m, SimdDouble v0, SimdDouble v1)

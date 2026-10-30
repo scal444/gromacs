@@ -698,6 +698,131 @@ TEST_F(SimdFloatingpointUtilTest, reduceIncr4Sum)
     EXPECT_REAL_EQ_TOL(sum0 + sum1 + sum2 + sum3, tstsum, tolerance);
 }
 
+/* The tests above use monotonically increasing offsets. Implementations that
+ * load contiguous chunks and transpose them with permutes (e.g. AVX-512) must
+ * place each point in the right lane for any offset order, so repeat the main
+ * gather/scatter transposes with a permuted, non-monotonic offset pattern.
+ */
+TEST_F(SimdFloatingpointUtilTest, transposesWithPermutedOffsets)
+{
+    for (int i = 0; i < GMX_SIMD_REAL_WIDTH; i++)
+    {
+        // 7 is coprime to every SIMD width, so this is a permutation of 0..width-1
+        offset_[i] = 3 * ((7 * i + 3) % GMX_SIMD_REAL_WIDTH);
+    }
+    const SimdReal ref0 = load<SimdReal>(val0_);
+    const SimdReal ref1 = load<SimdReal>(val1_);
+    const SimdReal ref2 = load<SimdReal>(val2_);
+    const SimdReal ref3 = load<SimdReal>(val3_);
+    SimdReal       v0, v1, v2, v3;
+
+    auto fill = [this](int align, int numComponents) {
+        const real* vals[4] = { val0_, val1_, val2_, val3_ };
+        for (std::size_t j = 0; j < s_workMemSize_; j++)
+        {
+            mem0_[j] = -1000.0 - j;
+        }
+        for (int j = 0; j < GMX_SIMD_REAL_WIDTH; j++)
+        {
+            for (int c = 0; c < numComponents; c++)
+            {
+                mem0_[align * offset_[j] + c] = vals[c][j];
+            }
+        }
+    };
+
+    fill(3, 3);
+    gatherLoadUTranspose<3>(mem0_, offset_, &v0, &v1, &v2);
+    GMX_EXPECT_SIMD_REAL_EQ(ref0, v0);
+    GMX_EXPECT_SIMD_REAL_EQ(ref1, v1);
+    GMX_EXPECT_SIMD_REAL_EQ(ref2, v2);
+
+    fill(4, 4);
+    gatherLoadTranspose<4>(mem0_, offset_, &v0, &v1, &v2, &v3);
+    GMX_EXPECT_SIMD_REAL_EQ(ref0, v0);
+    GMX_EXPECT_SIMD_REAL_EQ(ref1, v1);
+    GMX_EXPECT_SIMD_REAL_EQ(ref2, v2);
+    GMX_EXPECT_SIMD_REAL_EQ(ref3, v3);
+    gatherLoadBySimdIntTranspose<4>(mem0_, load<SimdInt32>(offset_), &v0, &v1);
+    GMX_EXPECT_SIMD_REAL_EQ(ref0, v0);
+    GMX_EXPECT_SIMD_REAL_EQ(ref1, v1);
+
+    fill(2, 2);
+    gatherLoadTranspose<2>(mem0_, offset_, &v0, &v1);
+    GMX_EXPECT_SIMD_REAL_EQ(ref0, v0);
+    GMX_EXPECT_SIMD_REAL_EQ(ref1, v1);
+
+#    if GMX_SIMD_HAVE_GATHER_LOADU_BYSIMDINT_TRANSPOSE_REAL
+    fill(1, 2);
+    // Overlapping pairs are fine for loads; the last write per element wins in fill(),
+    // so compare with what is actually in memory.
+    {
+        alignas(GMX_SIMD_ALIGNMENT) real e0[GMX_SIMD_REAL_WIDTH];
+        alignas(GMX_SIMD_ALIGNMENT) real e1[GMX_SIMD_REAL_WIDTH];
+        for (int j = 0; j < GMX_SIMD_REAL_WIDTH; j++)
+        {
+            e0[j] = mem0_[offset_[j]];
+            e1[j] = mem0_[offset_[j] + 1];
+        }
+        gatherLoadUBySimdIntTranspose<1>(mem0_, load<SimdInt32>(offset_), &v0, &v1);
+        GMX_EXPECT_SIMD_REAL_EQ(load<SimdReal>(e0), v0);
+        GMX_EXPECT_SIMD_REAL_EQ(load<SimdReal>(e1), v1);
+    }
+#    endif
+
+    for (int align : { 3, 4 })
+    {
+        SCOPED_TRACE("transposeScatterStoreU align " + std::to_string(align));
+        std::vector<real> refmem(s_workMemSize_);
+        for (std::size_t j = 0; j < s_workMemSize_; j++)
+        {
+            mem0_[j] = refmem[j] = 1000.0 + j;
+        }
+        for (int j = 0; j < GMX_SIMD_REAL_WIDTH; j++)
+        {
+            refmem[align * offset_[j]]     = val0_[j];
+            refmem[align * offset_[j] + 1] = val1_[j];
+            refmem[align * offset_[j] + 2] = val2_[j];
+        }
+        if (align == 3)
+        {
+            transposeScatterStoreU<3>(mem0_, offset_, ref0, ref1, ref2);
+        }
+        else
+        {
+            transposeScatterStoreU<4>(mem0_, offset_, ref0, ref1, ref2);
+        }
+        for (std::size_t j = 0; j < s_workMemSize_; j++)
+        {
+            EXPECT_EQ(refmem[j], mem0_[j]) << "at index " << j;
+        }
+    }
+
+#    if GMX_SIMD_HAVE_HSIMD_UTIL_REAL
+    for (int align : { 2, 4 })
+    {
+        SCOPED_TRACE("gatherLoadTransposeHsimd align " + std::to_string(align));
+        for (int j = 0; j < GMX_SIMD_REAL_WIDTH / 2; j++)
+        {
+            mem0_[align * offset_[j]]     = val0_[j];
+            mem0_[align * offset_[j] + 1] = val1_[j];
+            mem1_[align * offset_[j]]     = val0_[GMX_SIMD_REAL_WIDTH / 2 + j];
+            mem1_[align * offset_[j] + 1] = val1_[GMX_SIMD_REAL_WIDTH / 2 + j];
+        }
+        if (align == 2)
+        {
+            gatherLoadTransposeHsimd<2>(mem0_, mem1_, offset_, &v0, &v1);
+        }
+        else
+        {
+            gatherLoadTransposeHsimd<4>(mem0_, mem1_, offset_, &v0, &v1);
+        }
+        GMX_EXPECT_SIMD_REAL_EQ(ref0, v0);
+        GMX_EXPECT_SIMD_REAL_EQ(ref1, v1);
+    }
+#    endif
+}
+
 #    if GMX_SIMD_HAVE_HSIMD_UTIL_REAL
 
 TEST_F(SimdFloatingpointUtilTest, loadDualHsimd)
