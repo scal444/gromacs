@@ -322,18 +322,11 @@ static inline SimdFloat gmx_simdcall frexp(SimdFloat value, SimdFInt32* exponent
 template<MathOptimization opt = MathOptimization::Safe>
 static inline SimdFloat gmx_simdcall ldexp(SimdFloat value, SimdFInt32 exponent)
 {
-    const __m512i exponentBias = _mm512_set1_epi32(127);
-    __m512i       iExponent    = _mm512_add_epi32(exponent.simdInternal_, exponentBias);
-
-    if (opt == MathOptimization::Safe)
-    {
-        // Make sure biased argument is not negative
-        iExponent = _mm512_max_epi32(iExponent, _mm512_setzero_epi32());
-    }
-
-    iExponent = _mm512_slli_epi32(iExponent, 23);
-
-    return { _mm512_mul_ps(value.simdInternal_, _mm512_castsi512_ps(iExponent)) };
+    // vscalefps computes value*2^floor(exponent) and handles overflow (inf), underflow
+    // (denormal or zero) and the special values itself, so the same code serves as both
+    // the safe and the unsafe version. The int-to-float conversion is exact for
+    // |exponent| < 2^24, and larger magnitudes saturate the result to 0 or inf anyway.
+    return { _mm512_scalef_ps(value.simdInternal_, _mm512_cvtepi32_ps(exponent.simdInternal_)) };
 }
 
 static inline float gmx_simdcall reduce(SimdFloat a)

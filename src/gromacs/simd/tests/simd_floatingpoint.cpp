@@ -307,6 +307,43 @@ TEST_F(SimdFloatingpointTest, ldexp)
     GMX_EXPECT_SIMD_REAL_EQ(setZero(), ldexp(one, setSimdIntFrom3I(-2000, -1000000, -1000000000)));
 }
 
+#        if GMX_SIMD_X86_AVX_512
+/* The documented ldexp() contract only covers exponents for which 2^exponent
+ * itself is representable, and leaves results below the normal range to the
+ * implementation. The AVX-512 implementation uses vscalefps/vscalefpd, which
+ * computes value*2^exponent exactly like std::ldexp over the full range, so
+ * test that here (other implementations multiply by a constructed 2^exponent
+ * and do not provide this).
+ */
+TEST_F(SimdFloatingpointTest, ldexpFullRangeAvx512)
+{
+    constexpr int maxExp = std::numeric_limits<real>::max_exponent; // 128 or 1024
+    constexpr int minExp = std::numeric_limits<real>::min_exponent; // -125 or -1021
+    // value*2^maxExp is finite for |value| < 1, although 2^maxExp overflows
+    const real big = 0.75;
+    // Results in the denormal range, far more than the ulp tolerance away from zero
+    const int denormExp = minExp - 5;
+
+    for (auto opt : { MathOptimization::Safe, MathOptimization::Unsafe })
+    {
+        SCOPED_TRACE(opt == MathOptimization::Safe ? "Safe" : "Unsafe");
+        const SimdReal value = setSimdRealFrom3R(big, -big, 1.0);
+        const SimdInt32 exponent = setSimdIntFrom3I(maxExp, maxExp, denormExp);
+        const SimdReal  ref      = setSimdRealFrom3R(
+                std::ldexp(big, maxExp), std::ldexp(-big, maxExp), std::ldexp(real(1.0), denormExp));
+        const SimdReal result = (opt == MathOptimization::Safe)
+                                        ? ldexp(value, exponent)
+                                        : ldexp<MathOptimization::Unsafe>(value, exponent);
+        GMX_EXPECT_SIMD_REAL_EQ(ref, result);
+    }
+    // Overflow of the product gives inf, of either sign
+    GMX_EXPECT_SIMD_REAL_EQ(setSimdRealFrom3R(std::numeric_limits<real>::infinity(),
+                                              -std::numeric_limits<real>::infinity(),
+                                              std::numeric_limits<real>::infinity()),
+                            ldexp(setSimdRealFrom3R(1.0, -1.0, 1.0), setSimdIntFrom3I(maxExp, 2000, 1000000)));
+}
+#        endif
+
 /*
  * We do extensive 1/sqrt(x) and 1/x accuracy testing in the math module, so
  * we just make sure the lookup instructions appear to work here

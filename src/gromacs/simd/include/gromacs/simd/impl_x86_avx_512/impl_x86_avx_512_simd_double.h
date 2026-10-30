@@ -327,22 +327,10 @@ static inline SimdDouble frexp(SimdDouble value, SimdDInt32* exponent)
 template<MathOptimization opt = MathOptimization::Safe>
 static inline SimdDouble ldexp(SimdDouble value, SimdDInt32 exponent)
 {
-    const __m256i exponentBias = _mm256_set1_epi32(1023);
-    __m256i       iExponent    = _mm256_add_epi32(exponent.simdInternal_, exponentBias);
-    __m512i       iExponent512;
-
-    if (opt == MathOptimization::Safe)
-    {
-        // Make sure biased argument is not negative
-        iExponent = _mm256_max_epi32(iExponent, _mm256_setzero_si256());
-    }
-
-    iExponent512 =
-            _mm512_permutexvar_epi32(_mm512_set_epi32(7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0),
-                                     _mm512_castsi256_si512(iExponent));
-    iExponent512 =
-            _mm512_mask_slli_epi32(_mm512_setzero_epi32(), avx512Int2Mask(0xAAAA), iExponent512, 20);
-    return _mm512_mul_pd(_mm512_castsi512_pd(iExponent512), value.simdInternal_);
+    // vscalefpd computes value*2^floor(exponent) and handles overflow (inf), underflow
+    // (denormal or zero) and the special values itself, so the same code serves as both
+    // the safe and the unsafe version. The int32-to-double conversion is exact.
+    return { _mm512_scalef_pd(value.simdInternal_, _mm512_cvtepi32_pd(exponent.simdInternal_)) };
 }
 
 static inline double gmx_simdcall reduce(SimdDouble a)
