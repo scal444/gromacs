@@ -522,19 +522,32 @@ protected:
     }
 };
 
-//! Relative tolerance for comparing SIMD and plain-C results
-constexpr real c_relativeTolerance = GMX_DOUBLE ? 1e-8 : 2e-4;
-
-//! Returns whether \p a and \p b agree within \p tolerance times \p scale
-bool closeEnough(real a, real b, real scale)
+/*! \brief Relative tolerance for comparing SIMD and plain-C results
+ *
+ * On energy steps the plain-C LJ-14 kernel uses cubic-spline tables, whereas the SIMD
+ * kernel is analytical. In double precision the table error, a few 1e-7, dominates.
+ */
+real relativeTolerance(const Computes computes)
 {
-    return std::abs(a - b) <= c_relativeTolerance * std::max(scale, real(1));
+    if (GMX_DOUBLE)
+    {
+        return computes == Computes::Forces ? 1e-8 : 2e-6;
+    }
+    else
+    {
+        return 2e-4;
+    }
 }
 
 TEST_P(ListedForcesSimdTest, SimdMatchesPlainC)
 {
     const Output ref  = run(false);
     const Output simd = run(true);
+
+    const real tolerance = relativeTolerance(computes_);
+    // Returns whether a and b agree within the tolerance times scale
+    auto closeEnough = [tolerance](real a, real b, real scale)
+    { return std::abs(a - b) <= tolerance * std::max(scale, real(1)); };
 
     // Forces, compared relative to the largest force component
     real maxForce = 0;
@@ -551,7 +564,7 @@ TEST_P(ListedForcesSimdTest, SimdMatchesPlainC)
         for (int d = 0; d < DIM; d++)
         {
             EXPECT_TRUE(closeEnough(ref.f[a][d], simd.f[a][d], maxForce)) << formatString(
-                    "atom %d dim %d: plain-C %g SIMD %g", a, d, ref.f[a][d], simd.f[a][d]);
+                    "atom %d dim %d: plain-C %.12g SIMD %.12g max %g", a, d, ref.f[a][d], simd.f[a][d], maxForce);
         }
     }
 
@@ -562,7 +575,7 @@ TEST_P(ListedForcesSimdTest, SimdMatchesPlainC)
             if (ftype != InteractionFunction::LennardJones14)
             {
                 EXPECT_TRUE(closeEnough(ref.energies[ftype], simd.energies[ftype], std::abs(ref.energies[ftype])))
-                        << formatString("%s energy: plain-C %g SIMD %g",
+                        << formatString("%s energy: plain-C %.12g SIMD %.12g",
                                         interaction_function[ftype].longname,
                                         ref.energies[ftype],
                                         simd.energies[ftype]);
