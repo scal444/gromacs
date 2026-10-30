@@ -164,6 +164,28 @@ public:
 
     //! \copydoc Selection::initCoveredFraction()
     bool initCoveredFraction(e_coverfrac_t type);
+    /*! \brief
+     * Copies state that is set on a compiled selection by its user.
+     *
+     * \param[in] source  Selection from which this one was copied.
+     *
+     * Copies original ids (see Selection::setOriginalId() and
+     * Selection::initOriginalIdsToGroup()) and the covered fraction type,
+     * which are not reproduced by reparsing and compiling the selection
+     * text.  Both selections must be compiled and have the same positions.
+     */
+    void copyPostCompilationState(const SelectionData& source);
+    /*! \brief
+     * Adds the covered fractions accumulated in another selection to this one.
+     *
+     * \param[in] other  Copy of this selection evaluated for a different
+     *     set of frames.
+     *
+     * Used to combine covered fractions from selections that were evaluated
+     * on disjoint subsets of frames, before computeAverageCoveredFraction()
+     * is called with the total number of frames.
+     */
+    void addCoveredFractionSum(const SelectionData& other);
 
     /*! \brief
      * Updates the name of the selection if missing.

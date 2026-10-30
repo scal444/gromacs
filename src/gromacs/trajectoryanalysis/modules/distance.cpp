@@ -160,6 +160,7 @@ void Distance::initOptions(IOptionsContainer* options, TrajectoryAnalysisSetting
     };
 
     settings->setHelpText(desc);
+    settings->setFlag(TrajectoryAnalysisSettings::efFrameParallel);
 
     options->addOption(FileNameOption("oav")
                                .filetype(OptionFileType::Plot)
@@ -329,7 +330,7 @@ void Distance::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* pbc, Trajecto
 {
     AnalysisDataHandle   distHandle = pdata->dataHandle(distances_);
     AnalysisDataHandle   xyzHandle  = pdata->dataHandle(xyz_);
-    const SelectionList& sel        = TrajectoryAnalysisModuleData::parallelSelections(sel_);
+    const SelectionList& sel        = pdata->parallelSelections(sel_);
 
     checkSelections(sel);
 

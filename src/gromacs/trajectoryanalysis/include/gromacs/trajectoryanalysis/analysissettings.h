@@ -126,6 +126,25 @@ public:
          * \see setRmPBC()
          */
         efNoUserRmPBC = 1 << 5,
+        /*! \brief
+         * Allows frames to be analyzed concurrently in multiple threads.
+         *
+         * If this flag is set, TrajectoryAnalysisModule::analyzeFrame() may
+         * be called concurrently for different frames, each call with a
+         * different TrajectoryAnalysisModuleData object, and frames may be
+         * processed out of order.  The module must then only modify state
+         * through its TrajectoryAnalysisModuleData object and data handles,
+         * and must access selections through
+         * TrajectoryAnalysisModuleData::parallelSelection().
+         * Output written through AnalysisData objects is still processed
+         * in frame order.
+         *
+         * The flag can be set or cleared up to and including
+         * TrajectoryAnalysisModule::initAfterFirstFrame(), for example to
+         * disable parallelism for option combinations that need data
+         * from earlier frames.
+         */
+        efFrameParallel = 1 << 6,
     };
 
     //! Initializes default settings.

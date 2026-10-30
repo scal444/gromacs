@@ -51,6 +51,8 @@
 
 #include "gromacs/analysisdata/tests/datatest.h"
 #include "gromacs/commandline/cmdlineoptionsmodule.h"
+#include "gromacs/options/basicoptions.h"
+#include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/cmdlinerunner.h"
 #include "gromacs/utility/gmxassert.h"
@@ -58,6 +60,7 @@
 #include "testutils/cmdlinetest.h"
 #include "testutils/refdata.h"
 #include "testutils/testasserts.h"
+#include "testutils/testoptions.h"
 
 namespace gmx
 {
@@ -191,6 +194,25 @@ void AbstractTrajectoryAnalysisModuleTestFixture::setDatasetTolerance(const char
     dataset->second.tolerance = tolerance;
 }
 
+namespace
+{
+
+//! Number of threads passed with -nt to all analysis modules under test.
+int s_analysisThreadCount = 0;
+
+// cond/endcond do not seem to work here with Doxygen 1.8.5 parser.
+#ifndef DOXYGEN
+GMX_TEST_OPTIONS(TrajectoryAnalysisModuleTestOptions, options)
+{
+    options->addOption(IntegerOption("analysis-nt")
+                               .store(&s_analysisThreadCount)
+                               .description("Run analysis modules with -nt (frames are "
+                                            "analyzed concurrently by modules that support it)"));
+}
+#endif
+
+} // namespace
+
 void AbstractTrajectoryAnalysisModuleTestFixture::runTest(const CommandLine& args)
 {
     TrajectoryAnalysisModule& module  = impl_->module();
@@ -199,6 +221,13 @@ void AbstractTrajectoryAnalysisModuleTestFixture::runTest(const CommandLine& arg
 
     TestReferenceChecker rootChecker(this->rootChecker());
     rootChecker.checkString(args.toString(), "CommandLine");
+    // Added after the check so that threaded runs compare against the
+    // same reference data as serial runs.
+    if (s_analysisThreadCount > 0)
+    {
+        cmdline.append("-nt");
+        cmdline.append(std::to_string(s_analysisThreadCount));
+    }
 
     if (impl_->hasCheckedDatasets())
     {

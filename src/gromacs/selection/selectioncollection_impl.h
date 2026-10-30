@@ -44,6 +44,7 @@
 #ifndef GMX_SELECTION_SELECTIONCOLLECTION_IMPL_H
 #define GMX_SELECTION_SELECTIONCOLLECTION_IMPL_H
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -109,6 +110,35 @@ struct gmx_ana_selcollection_t
     std::unique_ptr<gmx::SelectionParserSymbolTable> symtab;
     //! Root of help topic tree (NULL is no help yet requested).
     gmx::HelpTopicPointer rootHelp;
+
+    //! Index group that a group reference has been resolved to.
+    struct ResolvedIndexGroup
+    {
+        //! Name of the group.
+        std::string name;
+        //! Atoms in the group.
+        std::vector<int> atoms;
+    };
+    /*! \brief
+     * Groups that index group references have been resolved to.
+     *
+     * Keyed by the name of the unresolved reference element.  Used to
+     * resolve the references in copies of the collection, which reparse
+     * the selection text after the index groups may have been freed.
+     */
+    std::map<std::string, ResolvedIndexGroup> resolvedGroups;
+
+    /*! \brief
+     * Resolves an index group reference and records the result.
+     *
+     * \param     sel   Element of type SEL_GROUPREF to resolve.
+     * \param[in] grps  Index groups to use (can be NULL).
+     * \throws    InconsistentInputError if the reference cannot be resolved.
+     *
+     * If \p grps is NULL, uses the group recorded earlier for the same
+     * reference, if any.
+     */
+    void resolveIndexGroupReference(gmx::SelectionTreeElement* sel, gmx_ana_indexgrps_t* grps);
 };
 
 namespace gmx
@@ -192,6 +222,8 @@ public:
     bool bExternalGroupsSet_;
     //! External index groups (can be NULL).
     gmx_ana_indexgrps_t* grps_;
+    //! Collection from which this collection was copied (can be NULL).
+    const SelectionCollection* source_ = nullptr;
 };
 
 /*! \internal

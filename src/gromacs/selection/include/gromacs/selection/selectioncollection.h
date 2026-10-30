@@ -404,6 +404,33 @@ public:
      */
     [[nodiscard]] std::optional<Selection> selection(std::string_view selName) const;
     /*! \brief
+     * Returns the selection in this collection that corresponds to a given
+     * selection.
+     *
+     * \param[in] selection  Selection that belongs to this collection, or
+     *     to the collection from which this collection was copied.
+     * \returns   \p selection if it belongs to this collection, otherwise
+     *     the selection at the same position in this collection.
+     *
+     * Selection objects created from a collection are not updated when a
+     * copy of that collection is evaluated; this method maps them to the
+     * selections owned by the copy.  The collection that was copied must
+     * still exist when this method is called with one of its selections.
+     *
+     * Does not throw.
+     */
+    [[nodiscard]] Selection correspondingSelection(const Selection& selection) const;
+    /*! \brief
+     * Adds covered fractions accumulated in a copy of this collection.
+     *
+     * \param[in] copy  Collection copied from this one and evaluated for a
+     *     disjoint set of frames.
+     *
+     * Must be called for every copy before evaluateFinal() when frames
+     * have been evaluated in copies of the collection instead of this one.
+     */
+    void addCoveredFractionSums(const SelectionCollection& copy);
+    /*! \brief
      * Prints a human-readable version of the internal selection element
      * tree.
      *

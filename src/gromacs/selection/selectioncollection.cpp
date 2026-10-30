@@ -88,6 +88,28 @@
 struct gmx_ana_indexgrps_t;
 struct t_pbc;
 
+/********************************************************************
+ * gmx_ana_selcollection_t
+ */
+
+void gmx_ana_selcollection_t::resolveIndexGroupReference(gmx::SelectionTreeElement* sel,
+                                                         gmx_ana_indexgrps_t*       grps)
+{
+    const std::string reference = sel->name();
+    if (grps == nullptr)
+    {
+        const auto recorded = resolvedGroups.find(reference);
+        if (recorded != resolvedGroups.end())
+        {
+            sel->resolveIndexGroupReference(recorded->second.atoms, recorded->second.name, gall.isize);
+            return;
+        }
+    }
+    sel->resolveIndexGroupReference(grps, gall.isize);
+    const gmx_ana_index_t& group = sel->u.cgrp;
+    resolvedGroups[reference] = { sel->name(), std::vector<int>(group.index, group.index + group.isize) };
+}
+
 namespace gmx
 {
 
@@ -480,7 +502,7 @@ void SelectionCollection::Impl::resolveExternalGroups(const SelectionTreeElement
     {
         try
         {
-            root->resolveIndexGroupReference(grps_, sc_.gall.isize);
+            sc_.resolveIndexGroupReference(root.get(), grps_);
         }
         catch (const UserInputError&)
         {
@@ -544,6 +566,8 @@ SelectionCollection::~SelectionCollection() = default;
 SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
     impl_(std::make_unique<Impl>())
 {
+    impl_->source_            = &rhs;
+    impl_->sc_.resolvedGroups = rhs.impl_->sc_.resolvedGroups;
     setReferencePosType(rhs.impl_->rpost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
                                                   : rhs.impl_->rpost_.c_str());
     setOutputPosType(rhs.impl_->spost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
@@ -565,7 +589,9 @@ SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
         gmx_ana_index_copy(&impl_->sc_.gall, &rhs.impl_->sc_.gall, /*balloc=*/false);
     }
 
-    if (rhs.impl_->grps_ != nullptr)
+    // If the index groups of rhs have already been freed, references
+    // are resolved to the groups recorded in rhs.
+    if (rhs.impl_->bExternalGroupsSet_)
     {
         setIndexGroups(rhs.impl_->grps_);
     }
@@ -574,6 +600,12 @@ SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
     if (rhs.impl_->sc_.mempool != nullptr)
     {
         compile();
+        // Original ids and covered fraction types are set after
+        // compilation and are not reproduced by compiling the text.
+        for (size_t i = 0; i < rhs.impl_->sc_.sel.size(); i++)
+        {
+            impl_->sc_.sel[i]->copyPostCompilationState(*rhs.impl_->sc_.sel[i]);
+        }
     }
 }
 
@@ -927,6 +959,41 @@ void SelectionCollection::evaluate(t_trxframe* fr, t_pbc* pbc)
     }
 }
 
+
+Selection SelectionCollection::correspondingSelection(const Selection& selection) const
+{
+    const auto& selections = impl_->sc_.sel;
+    for (const auto& ownSelection : selections)
+    {
+        if (Selection(ownSelection.get()) == selection)
+        {
+            return selection;
+        }
+    }
+    GMX_RELEASE_ASSERT(impl_->source_ != nullptr, "Selection does not belong to this collection");
+    const auto& sourceSelections = impl_->source_->impl_->sc_.sel;
+    GMX_RELEASE_ASSERT(sourceSelections.size() == selections.size(),
+                       "Collection is not a copy of the source collection");
+    for (size_t i = 0; i < sourceSelections.size(); ++i)
+    {
+        if (Selection(sourceSelections[i].get()) == selection)
+        {
+            return Selection(selections[i].get());
+        }
+    }
+    GMX_RELEASE_ASSERT(false, "Selection does not belong to the source collection");
+    return Selection();
+}
+
+void SelectionCollection::addCoveredFractionSums(const SelectionCollection& copy)
+{
+    GMX_RELEASE_ASSERT(copy.impl_->sc_.sel.size() == impl_->sc_.sel.size(),
+                       "Collection is not a copy of this collection");
+    for (size_t i = 0; i < impl_->sc_.sel.size(); ++i)
+    {
+        impl_->sc_.sel[i]->addCoveredFractionSum(*copy.impl_->sc_.sel[i]);
+    }
+}
 
 void SelectionCollection::evaluateFinal(int nframes)
 {

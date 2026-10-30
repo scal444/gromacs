@@ -270,7 +270,7 @@ void Scattering::initAnalysis(const TrajectoryAnalysisSettings& settings, const 
 void Scattering::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* pbc, TrajectoryAnalysisModuleData* pdata)
 {
     AnalysisDataHandle   scatterHandle = pdata->dataHandle(intensity_);
-    const SelectionList& sel = gmx::TrajectoryAnalysisModuleData::parallelSelections(sel_);
+    const SelectionList& sel           = pdata->parallelSelections(sel_);
     scatterHandle.startFrame(frnr, fr.time);
     matrix fBox;
     copy_mat(fr.box, fBox);

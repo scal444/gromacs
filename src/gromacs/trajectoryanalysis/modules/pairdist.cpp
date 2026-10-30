@@ -228,6 +228,7 @@ void PairDistance::initOptions(IOptionsContainer* options, TrajectoryAnalysisSet
     };
 
     settings->setHelpText(desc);
+    settings->setFlag(TrajectoryAnalysisSettings::efFrameParallel);
 
     options->addOption(FileNameOption("o")
                                .filetype(OptionFileType::Plot)
@@ -425,8 +426,8 @@ TrajectoryAnalysisModuleDataPointer PairDistance::startFrames(const AnalysisData
 void PairDistance::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* pbc, TrajectoryAnalysisModuleData* pdata)
 {
     AnalysisDataHandle      dh         = pdata->dataHandle(distances_);
-    const Selection&        refSel     = TrajectoryAnalysisModuleData::parallelSelection(refSel_);
-    const SelectionList&    sel        = TrajectoryAnalysisModuleData::parallelSelections(sel_);
+    const Selection&        refSel     = pdata->parallelSelection(refSel_);
+    const SelectionList&    sel        = pdata->parallelSelections(sel_);
     PairDistanceModuleData& frameData  = *static_cast<PairDistanceModuleData*>(pdata);
     std::vector<real>&      distArray  = frameData.distArray_;
     std::vector<int>&       countArray = frameData.countArray_;
