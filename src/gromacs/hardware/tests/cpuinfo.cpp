@@ -45,6 +45,7 @@
 #include "config.h"
 
 #include <ostream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -94,6 +95,72 @@ TEST(CpuInfoTest, SupportLevel)
                     << "Impossible pu index for logical processor. " << commonMsg << std::endl;
         }
     }
+}
+
+
+//! Feature set as cpuid reports it on an AVX-512 machine
+const std::set<CpuInfo::Feature> c_avx512CpuidFeatures = {
+    CpuInfo::Feature::X86_Sse2,       CpuInfo::Feature::X86_Sse4_1,
+    CpuInfo::Feature::X86_Avx,        CpuInfo::Feature::X86_Avx2,
+    CpuInfo::Feature::X86_Fma,        CpuInfo::Feature::X86_F16C,
+    CpuInfo::Feature::X86_Avx512F,    CpuInfo::Feature::X86_Avx512CD,
+    CpuInfo::Feature::X86_Avx512BW,   CpuInfo::Feature::X86_Avx512VL,
+    CpuInfo::Feature::X86_Avx512BF16, CpuInfo::Feature::X86_Avx512secondFMA
+};
+
+//! The features that do not need any OS-enabled extended state
+const std::set<CpuInfo::Feature> c_sseFeatures = { CpuInfo::Feature::X86_Sse2, CpuInfo::Feature::X86_Sse4_1 };
+
+//! The features that only need the OS-enabled SSE and AVX state
+const std::set<CpuInfo::Feature> c_avxFeatures = {
+    CpuInfo::Feature::X86_Sse2, CpuInfo::Feature::X86_Sse4_1, CpuInfo::Feature::X86_Avx,
+    CpuInfo::Feature::X86_Avx2, CpuInfo::Feature::X86_Fma,    CpuInfo::Feature::X86_F16C
+};
+
+TEST(CpuInfoTest, X86FeaturesKeptWhenOsEnablesAllState)
+{
+    // x87, SSE, AVX, opmask, ZMM_Hi256 and Hi16_ZMM, as on bare-metal AVX-512 machines
+    EXPECT_EQ(c_avx512CpuidFeatures,
+              detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, true, 0xe7));
+    // Additional state bits (here PKRU and AMX) do not matter
+    EXPECT_EQ(c_avx512CpuidFeatures,
+              detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, true, 0x602e7));
+}
+
+TEST(CpuInfoTest, X86Avx512FeaturesRemovedWithoutOsAvx512State)
+{
+    // e.g. a hypervisor that passes through the cpuid bits but disables the AVX-512 state
+    EXPECT_EQ(c_avxFeatures, detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, true, 0x07));
+}
+
+TEST(CpuInfoTest, X86Avx512FeaturesRemovedWithPartialOsAvx512State)
+{
+    // Opmask and ZMM_Hi256 state, but no Hi16_ZMM state
+    EXPECT_EQ(c_avxFeatures, detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, true, 0x67));
+}
+
+TEST(CpuInfoTest, X86AvxFeaturesRemovedWithoutOsXsave)
+{
+    // e.g. a Linux kernel booted with noxsave; XCR0 must then be ignored
+    EXPECT_EQ(c_sseFeatures, detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, false, 0));
+    EXPECT_EQ(c_sseFeatures, detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, false, 0xe7));
+}
+
+TEST(CpuInfoTest, X86AvxFeaturesRemovedWithoutOsAvxState)
+{
+    // OSXSAVE is set, but only the x87 and SSE state are enabled
+    EXPECT_EQ(c_sseFeatures, detail::filterX86FeaturesByOsSupport(c_avx512CpuidFeatures, true, 0x03));
+}
+
+TEST(CpuInfoTest, X86AvxOnlyFeaturesNeedOnlyAvxState)
+{
+    const std::set<CpuInfo::Feature> amdFeatures = { CpuInfo::Feature::X86_Sse2,
+                                                     CpuInfo::Feature::X86_Avx,
+                                                     CpuInfo::Feature::X86_Fma4,
+                                                     CpuInfo::Feature::X86_Xop };
+    EXPECT_EQ(amdFeatures, detail::filterX86FeaturesByOsSupport(amdFeatures, true, 0x07));
+    EXPECT_EQ(std::set<CpuInfo::Feature>{ CpuInfo::Feature::X86_Sse2 },
+              detail::filterX86FeaturesByOsSupport(amdFeatures, true, 0x03));
 }
 
 } // namespace
