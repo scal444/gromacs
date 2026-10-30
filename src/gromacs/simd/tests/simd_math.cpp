@@ -834,13 +834,19 @@ TEST_F(SimdMathTest, atan2)
     GMX_EXPECT_SIMD_REAL_NEAR(setSimdRealFrom1R(0.0), atan2(setSimdRealFrom3R(0.0, 0.0, 0.0), setZero()));
 }
 
-/*! \brief Evaluate reference version of PME force correction. */
-real refPmeForceCorrection(real x)
+/*! \brief Evaluate reference version of PME force correction.
+ *
+ * The two terms nearly cancel for small x (both are ~1/x), so this is evaluated in
+ * double precision also in mixed precision; in float the reference itself has an
+ * error of ~3e-4 at x=1e-4.
+ */
+real refPmeForceCorrection(real xReal)
 {
+    const double x = xReal;
     if (x != 0)
     {
-        real y = std::sqrt(x);
-        return 2 * std::exp(-x) / (std::sqrt(M_PI) * x) - std::erf(static_cast<double>(y)) / (x * y);
+        const double y = std::sqrt(x);
+        return 2 * std::exp(-x) / (std::sqrt(M_PI) * x) - std::erf(y) / (x * y);
     }
     else
     {
@@ -849,12 +855,19 @@ real refPmeForceCorrection(real x)
 }
 
 // The PME corrections will be added to ~1/r2, so absolute tolerance of EPS is fine.
+// The approximation is documented to be accurate up to z^2 = 16 (beta*r = 4), and
+// typical Ewald settings use beta*rc of about 3.1-3.5, so test the whole range.
 TEST_F(SimdMathTest, pmeForceCorrection)
 {
     // Pme correction relative accuracy only needs to be ~1e-6 accuracy single, 1e-10 double
-    const std::int64_t ulpTol = (GMX_DOUBLE ? 5e-10 : 5e-6) / GMX_REAL_EPS;
+    const real         relTol = (GMX_DOUBLE ? 5e-10 : 5e-6);
+    const std::int64_t ulpTol = relTol / GMX_REAL_EPS;
 
-    CompareSettings settings{ { 0.15, 4 }, ulpTol, GMX_REAL_EPS, MatchRule::Normal };
+    CompareSettings settings{ { 0.15, 16 }, ulpTol, GMX_REAL_EPS, MatchRule::Normal };
+    GMX_EXPECT_SIMD_FUNC_NEAR(refPmeForceCorrection, pmeForceCorrection, settings);
+
+    // Short distances: the function value is ~-0.75 here, so use an absolute tolerance
+    settings = { { 1e-4, 0.15 }, ulpTol, relTol, MatchRule::Normal };
     GMX_EXPECT_SIMD_FUNC_NEAR(refPmeForceCorrection, pmeForceCorrection, settings);
 }
 
@@ -869,9 +882,14 @@ real refPmePotentialCorrection(real x)
 TEST_F(SimdMathTest, pmePotentialCorrection)
 {
     // Pme correction relative accuracy only needs to be ~1e-6 accuracy single, 1e-10 double
-    const std::int64_t ulpTol = (GMX_DOUBLE ? 5e-10 : 5e-6) / GMX_REAL_EPS;
+    const real         relTol = (GMX_DOUBLE ? 5e-10 : 5e-6);
+    const std::int64_t ulpTol = relTol / GMX_REAL_EPS;
 
-    CompareSettings settings{ { 0.15, 4 }, ulpTol, GMX_REAL_EPS, MatchRule::Normal };
+    CompareSettings settings{ { 0.15, 16 }, ulpTol, GMX_REAL_EPS, MatchRule::Normal };
+    GMX_EXPECT_SIMD_FUNC_NEAR(refPmePotentialCorrection, pmePotentialCorrection, settings);
+
+    // Short distances: the function value is ~1.13 here, so use an absolute tolerance
+    settings = { { 1e-4, 0.15 }, ulpTol, relTol, MatchRule::Normal };
     GMX_EXPECT_SIMD_FUNC_NEAR(refPmePotentialCorrection, pmePotentialCorrection, settings);
 }
 
@@ -1336,7 +1354,10 @@ TEST_F(SimdMathTest, pmeForceCorrectionSingleAccuracy)
     // Then increase the allowed error by the difference between the actual precision and single.
     setUlpTolSingleAccuracy(std::int64_t(5e-6 / GMX_FLOAT_EPS));
 
-    CompareSettings settings{ { 0.15, 4 }, ulpTol_, GMX_FLOAT_EPS, MatchRule::Normal };
+    CompareSettings settings{ { 0.15, 16 }, ulpTol_, GMX_FLOAT_EPS, MatchRule::Normal };
+    GMX_EXPECT_SIMD_FUNC_NEAR(refPmeForceCorrection, pmeForceCorrectionSingleAccuracy, settings);
+
+    settings = { { 1e-4, 0.15 }, ulpTol_, 5e-6, MatchRule::Normal };
     GMX_EXPECT_SIMD_FUNC_NEAR(refPmeForceCorrection, pmeForceCorrectionSingleAccuracy, settings);
 }
 
@@ -1347,7 +1368,10 @@ TEST_F(SimdMathTest, pmePotentialCorrectionSingleAccuracy)
     // Then increase the allowed error by the difference between the actual precision and single.
     setUlpTolSingleAccuracy(std::int64_t(5e-6 / GMX_FLOAT_EPS));
 
-    CompareSettings settings{ { 0.15, 4 }, ulpTol_, GMX_FLOAT_EPS, MatchRule::Normal };
+    CompareSettings settings{ { 0.15, 16 }, ulpTol_, GMX_FLOAT_EPS, MatchRule::Normal };
+    GMX_EXPECT_SIMD_FUNC_NEAR(refPmePotentialCorrection, pmePotentialCorrectionSingleAccuracy, settings);
+
+    settings = { { 1e-4, 0.15 }, ulpTol_, 5e-6, MatchRule::Normal };
     GMX_EXPECT_SIMD_FUNC_NEAR(refPmePotentialCorrection, pmePotentialCorrectionSingleAccuracy, settings);
 }
 
