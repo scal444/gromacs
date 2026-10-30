@@ -52,6 +52,7 @@ gmx_add_unit_test(MdlibUnitTest mdlib-test HARDWARE_DETECTION
         simulationsignal.cpp
         updategroups.cpp
         updategroupscog.cpp
+        updatesd.cpp
         vsite.cpp
     GPU_CPP_SOURCE_FILES
         constr.cpp

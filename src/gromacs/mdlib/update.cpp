@@ -58,6 +58,7 @@
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdlib/stat.h"
 #include "gromacs/mdlib/tgroup.h"
+#include "gromacs/mdlib/update_sd.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/fcdata.h"
 #include "gromacs/mdtypes/group.h"
@@ -86,16 +87,6 @@
 
 namespace gmx
 {
-struct gmx_sd_const_t
-{
-    double em = 0;
-};
-
-struct gmx_sd_sigma_t
-{
-    real V = 0;
-};
-
 struct gmx_stochd_t
 {
     /* BD stuff */
@@ -1137,145 +1128,6 @@ void Update::updateAfterPartition(int                            numAtoms,
 namespace
 {
 
-/*! \brief Sets the SD update type */
-enum class SDUpdate : int
-{
-    ForcesOnly,
-    FrictionAndNoiseOnly,
-    Combined,
-    Count
-};
-
-/*! \brief SD integrator update
- *
- * Two phases are required in the general case of a constrained
- * update, the first phase from the contribution of forces, before
- * applying constraints, and then a second phase applying the friction
- * and noise, and then further constraining. For details, see
- * Goga2012.
- *
- * Without constraints, the two phases can be combined, for
- * efficiency.
- *
- * Thus three instantiations of this templated function will be made,
- * two with only one contribution, and one with both contributions.
- *
- * To maximize the ability of the compiler to optimize, all the arrays
- * of RVec should be annotated with gmx_restrict, so the compiler knows
- * there is no aliasing, and for the same reason we do not use
- * ArrayRef<RVec> for them. */
-template<SDUpdate updateType>
-void doSDUpdateGeneral(const gmx_stochd_t&            sd,
-                       int                            start,
-                       int                            nrend,
-                       real                           dt,
-                       ArrayRef<const ivec>           nFreeze,
-                       ArrayRef<const real>           invmass,
-                       ArrayRef<const ParticleType>   ptype,
-                       ArrayRef<const unsigned short> cFREEZE,
-                       ArrayRef<const unsigned short> cTC,
-                       ArrayRef<const unsigned short> cAcceleration,
-                       const RVec* gmx_restrict       acceleration,
-                       const RVec* gmx_restrict       x,
-                       RVec* gmx_restrict             xprime,
-                       RVec* gmx_restrict             v,
-                       const RVec* gmx_restrict       f,
-                       int64_t                        step,
-                       int                            seed,
-                       const int*                     gatindex,
-                       real                           dtPressureCouple,
-                       const Matrix3x3&               parrinelloRahmanM)
-{
-    // cTC, cACC and cFREEZE can be nullptr any time, but various
-    // instantiations do not make sense with particular pointer
-    // values.
-    if (updateType == SDUpdate::ForcesOnly)
-    {
-        GMX_ASSERT(f != nullptr, "SD update with only forces requires forces");
-        GMX_ASSERT(cTC.empty(), "SD update with only forces cannot handle temperature groups");
-    }
-    if (updateType == SDUpdate::FrictionAndNoiseOnly)
-    {
-        GMX_ASSERT(f == nullptr, "SD update with only noise cannot handle forces");
-        GMX_ASSERT(cAcceleration.empty(),
-                   "SD update with only noise cannot handle acceleration groups");
-    }
-    if (updateType == SDUpdate::Combined)
-    {
-        GMX_ASSERT(f != nullptr, "SD update with forces and noise requires forces");
-    }
-
-    // Even 0 bits internal counter gives 2x64 ints (more than enough for three table lookups)
-    ThreeFry2x64<0>                       rng(seed, RandomDomain::UpdateCoordinates);
-    TabulatedNormalDistribution<real, 14> dist;
-
-    for (int n = start; n < nrend; n++)
-    {
-        const int globalAtomIndex = gatindex ? gatindex[n] : n;
-        rng.restart(step, globalAtomIndex);
-        dist.reset();
-
-        const real inverseMass = invmass[n];
-        const real invsqrtMass = std::sqrt(inverseMass);
-
-        const int freezeGroup       = !cFREEZE.empty() ? cFREEZE[n] : 0;
-        const int accelerationGroup = !cAcceleration.empty() ? cAcceleration[n] : 0;
-        const int temperatureGroup  = !cTC.empty() ? cTC[n] : 0;
-
-        RVec parrinelloRahmanScaledVelocity;
-        if (updateType != SDUpdate::FrictionAndNoiseOnly)
-        {
-            parrinelloRahmanScaledVelocity = dtPressureCouple * (parrinelloRahmanM * v[n]);
-        }
-        for (int d = 0; d < DIM; d++)
-        {
-            if ((ptype[n] != ParticleType::Shell) && !nFreeze[freezeGroup][d])
-            {
-                if (updateType == SDUpdate::ForcesOnly)
-                {
-                    real vn = v[n][d] + (inverseMass * f[n][d] + acceleration[accelerationGroup][d]) * dt
-                              - parrinelloRahmanScaledVelocity[d];
-                    v[n][d] = vn;
-                    // Simple position update.
-                    xprime[n][d] = x[n][d] + v[n][d] * dt;
-                }
-                else if (updateType == SDUpdate::FrictionAndNoiseOnly)
-                {
-                    real vn = v[n][d];
-                    v[n][d] = (vn * sd.sdc[temperatureGroup].em
-                               + invsqrtMass * sd.sdsig[temperatureGroup].V * dist(rng));
-                    // The previous phase already updated the
-                    // positions with a full v*dt term that must
-                    // now be half removed.
-                    xprime[n][d] = xprime[n][d] + 0.5 * (v[n][d] - vn) * dt;
-                }
-                else
-                {
-                    real vn = v[n][d] + (inverseMass * f[n][d] + acceleration[accelerationGroup][d]) * dt
-                              - parrinelloRahmanScaledVelocity[d];
-                    v[n][d] = (vn * sd.sdc[temperatureGroup].em
-                               + invsqrtMass * sd.sdsig[temperatureGroup].V * dist(rng));
-                    // Here we include half of the friction+noise
-                    // update of v into the position update.
-                    xprime[n][d] = x[n][d] + 0.5 * (vn + v[n][d]) * dt;
-                }
-            }
-            else
-            {
-                // When using constraints, the update is split into
-                // two phases, but we only need to zero the update of
-                // virtual, shell or frozen particles in at most one
-                // of the phases.
-                if (updateType != SDUpdate::FrictionAndNoiseOnly)
-                {
-                    v[n][d]      = 0.0;
-                    xprime[n][d] = x[n][d];
-                }
-            }
-        }
-    }
-}
-
 void do_update_sd(int                            start,
                   int                            nrend,
                   real                           dt,
@@ -1315,49 +1167,55 @@ void do_update_sd(int                            start,
     if (haveConstraints)
     {
         // With constraints, the SD update is done in 2 parts
-        doSDUpdateGeneral<SDUpdate::ForcesOnly>(sd,
-                                                start,
-                                                nrend,
-                                                dt,
-                                                nFreeze,
-                                                invmass,
-                                                ptype,
-                                                cFREEZE,
-                                                ArrayRef<const unsigned short>{},
-                                                cAcceleration,
-                                                acceleration.data(),
-                                                x,
-                                                xprime,
-                                                v,
-                                                f,
-                                                step,
-                                                seed,
-                                                nullptr,
-                                                dtPressureCouple,
-                                                parrinelloRahmanMToUseThisStep);
+        doSDUpdate(SDUpdate::ForcesOnly,
+                   SDUpdateKernel::SimdWhenPossible,
+                   sd.sdc,
+                   sd.sdsig,
+                   start,
+                   nrend,
+                   dt,
+                   nFreeze,
+                   invmass,
+                   ptype,
+                   cFREEZE,
+                   ArrayRef<const unsigned short>{},
+                   cAcceleration,
+                   acceleration.data(),
+                   x,
+                   xprime,
+                   v,
+                   f,
+                   step,
+                   seed,
+                   nullptr,
+                   dtPressureCouple,
+                   parrinelloRahmanMToUseThisStep);
     }
     else
     {
-        doSDUpdateGeneral<SDUpdate::Combined>(sd,
-                                              start,
-                                              nrend,
-                                              dt,
-                                              nFreeze,
-                                              invmass,
-                                              ptype,
-                                              cFREEZE,
-                                              cTC,
-                                              cAcceleration,
-                                              acceleration.data(),
-                                              x,
-                                              xprime,
-                                              v,
-                                              f,
-                                              step,
-                                              seed,
-                                              (dd != nullptr) ? dd->globalAtomIndices.data() : nullptr,
-                                              dtPressureCouple,
-                                              parrinelloRahmanMToUseThisStep);
+        doSDUpdate(SDUpdate::Combined,
+                   SDUpdateKernel::SimdWhenPossible,
+                   sd.sdc,
+                   sd.sdsig,
+                   start,
+                   nrend,
+                   dt,
+                   nFreeze,
+                   invmass,
+                   ptype,
+                   cFREEZE,
+                   cTC,
+                   cAcceleration,
+                   acceleration.data(),
+                   x,
+                   xprime,
+                   v,
+                   f,
+                   step,
+                   seed,
+                   (dd != nullptr) ? dd->globalAtomIndices.data() : nullptr,
+                   dtPressureCouple,
+                   parrinelloRahmanMToUseThisStep);
     }
 }
 
@@ -1651,27 +1509,29 @@ void Update::Impl::update_sd_second_half(const t_inputrec&            inputRecor
                 int start_th, end_th;
                 getThreadAtomRange(nth, th, homenr, &start_th, &end_th);
 
-                doSDUpdateGeneral<SDUpdate::FrictionAndNoiseOnly>(
-                        sd_,
-                        start_th,
-                        end_th,
-                        dt,
-                        arrayRefFromArray(inputRecord.opts.nFreeze, inputRecord.opts.ngfrz),
-                        invMass,
-                        ptype,
-                        cFREEZE_,
-                        cTC_,
-                        cAcceleration_,
-                        inputRecord.opts.acceleration.data(),
-                        state->x.data(),
-                        xp_.data(),
-                        state->v.data(),
-                        nullptr,
-                        step,
-                        inputRecord.ld_seed,
-                        dd ? dd->globalAtomIndices.data() : nullptr,
-                        dtPressureCouple,
-                        parrinelloRahmanM);
+                doSDUpdate(SDUpdate::FrictionAndNoiseOnly,
+                           SDUpdateKernel::SimdWhenPossible,
+                           sd_.sdc,
+                           sd_.sdsig,
+                           start_th,
+                           end_th,
+                           dt,
+                           arrayRefFromArray(inputRecord.opts.nFreeze, inputRecord.opts.ngfrz),
+                           invMass,
+                           ptype,
+                           cFREEZE_,
+                           cTC_,
+                           cAcceleration_,
+                           inputRecord.opts.acceleration.data(),
+                           state->x.data(),
+                           xp_.data(),
+                           state->v.data(),
+                           nullptr,
+                           step,
+                           inputRecord.ld_seed,
+                           dd ? dd->globalAtomIndices.data() : nullptr,
+                           dtPressureCouple,
+                           parrinelloRahmanM);
             }
             GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
         }
