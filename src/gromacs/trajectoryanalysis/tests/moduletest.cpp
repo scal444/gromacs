@@ -165,6 +165,7 @@ void AbstractTrajectoryAnalysisModuleTestFixture::includeDataset(const char* nam
         {
             i->second.bCheck = false;
         }
+        impl_->bDatasetsIncluded_ = true;
     }
     Impl::DatasetList::iterator dataset = impl_->datasets_.find(name);
     const bool                  bFound  = (dataset != impl_->datasets_.end());

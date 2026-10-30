@@ -1,0 +1,5088 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="referencedata.xsl"?>
+<ReferenceData>
+  <String Name="CommandLine">trajectory -select 'resnr 1' 'resnr 2'</String>
+  <OutputData Name="Data">
+    <AnalysisData Name="f">
+      <DataFrame Name="Frame0">
+        <Real Name="X">0</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.68901825</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.017868042</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.48953557</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.055107117</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.10648346</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.054122925</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.028255463</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.19238329</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.18117237</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-0.1371994</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.42622375</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.56835175</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.064353943</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.15873718</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.046981812</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.065490723</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.00074386597</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.16525269</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame1">
+        <Real Name="X">0.0020000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-1228.8065</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-294.67279</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-500.00851</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">396.19073</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-117.41795</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-32.807755</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">846.12396</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">415.07013</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">542.86707</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">29.597771</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-287.44351</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-326.33386</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-140.3241</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-368.08939</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">682.8877</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">96.58989</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">652.88928</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-365.54639</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame2">
+        <Real Name="X">0.0040000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-1129.3724</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-113.29457</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-245.826</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">502.87396</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">5.3941422</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">80.772079</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">653.16223</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">105.76514</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">176.40089</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-55.241287</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">40.134232</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-60.658897</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-95.733688</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-514.50848</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">542.28998</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">123.75138</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">476.80615</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-491.93002</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame3">
+        <Real Name="X">0.0060000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-145.28624</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">412.44165</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">317.99936</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">293.03467</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">278.99454</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">276.77859</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-109.68971</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-708.47052</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-591.56458</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-65.252892</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">712.78284</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">627.51874</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">7.5050545</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-377.20944</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-275.14078</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">19.154762</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-318.27109</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-354.56512</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame4">
+        <Real Name="X">0.0080000004</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">436.49716</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">495.841</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">381.3862</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">18.171909</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">389.43176</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">333.93674</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-410.56381</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-923.23566</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-726.32867</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">18.29179</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">884.26495</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">863.41925</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">23.064299</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-151.44856</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-706.14746</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-85.980568</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-694.61719</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-145.2829</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame5">
+        <Real Name="X">0.0099999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">84.08062</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-116.60666</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-105.40452</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-83.743988</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">163.55048</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">145.81979</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">40.904362</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-105.99814</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-67.131584</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-61.929447</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">195.16447</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">160.29913</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">25.131924</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.7459183</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-153.74539</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-4.9405956</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-138.66714</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">21.081158</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame6">
+        <Real Name="X">0.012</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-396.55707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-666.42822</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-449.98099</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-56.946827</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-216.3288</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-128.30179</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">484.35205</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">807.74139</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">538.55438</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-345.30728</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-702.89667</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-844.31647</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">117.55943</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">135.50421</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">688.70575</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">196.41492</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">642.53558</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">196.17667</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame7">
+        <Real Name="X">0.014</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">1.6105423</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-355.26248</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-227.56778</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-132.65973</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-416.82651</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-247.75687</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">151.87772</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">687.68903</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">426.42661</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-468.47864</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-854.23218</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1057.3196</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">204.6626</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">316.17056</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">712.60919</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">242.48877</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">622.54004</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">394.36661</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame8">
+        <Real Name="X">0.016000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">1019.8868</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">527.27832</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">212.28366</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-363.61453</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-325.03094</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-168.58565</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-636.72363</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-289.98077</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-98.836632</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-220.55017</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-210.56383</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-344.99377</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">152.2325</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">483.16782</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-127.31252</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">48.249084</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-184.81985</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">528.13892</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame9">
+        <Real Name="X">0.017999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">1386.6024</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">859.89008</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">313.88904</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-485.90829</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-124.26362</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-48.684021</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-871.742</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-820.70007</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-324.06769</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">58.835033</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">318.08826</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">293.79724</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">34.697762</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">490.12045</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-730.31891</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-122.99525</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-723.10181</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">496.02625</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame10">
+        <Real Name="X">0.02</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">542.55457</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">139.05505</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">16.594559</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-262.8425</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-19.865444</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-23.731783</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-235.5493</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-196.13414</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-52.86948</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-65.756798</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">140.45947</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">136.35931</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">37.094872</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">223.21814</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-311.17468</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-15.959932</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-286.71475</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">235.42416</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame11">
+        <Real Name="X">0.022</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-627.06854</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-773.22089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-230.92142</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">166.89328</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.9419327</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-69.08905</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">518.25891</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">705.69</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">241.83644</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-422.55716</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-271.30649</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-336.66266</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">139.47493</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-214.27762</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">562.13892</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">224.60197</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">550.17822</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-166.73077</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame12">
+        <Real Name="X">0.024</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-1013.2895</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-707.08136</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-104.58807</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">433.15616</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">107.57558</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-73.546188</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">646.89362</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">547.711</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">124.07128</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-389.13657</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-154.35898</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-239.70041</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">106.02993</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-487.10947</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">729.6745</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">215.99188</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">693.26215</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-435.36945</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame13">
+        <Real Name="X">0.026000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-552.31299</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">210.53868</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">166.76654</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">349.80353</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">337.01379</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">6.654171</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">274.0827</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-591.90228</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-223.28375</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">211.12045</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">485.53256</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">476.94321</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-155.5629</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-396.83408</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-37.673267</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-127.47176</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-44.352894</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-388.90384</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame14">
+        <Real Name="X">0.028000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-9.9889832</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">673.20129</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">197.30777</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">90.045639</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">498.39417</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">90.674973</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-4.365202</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1218.2812</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-335.83148</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">742.86951</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">923.48102</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">991.93488</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-392.44147</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-164.20801</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-750.75946</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-426.47174</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-712.60919</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-192.86987</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame15">
+        <Real Name="X">0.029999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">19.828968</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">24.791769</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-6.971611</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-48.066208</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">364.99179</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">73.880562</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">107.56941</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-448.77405</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-115.64495</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">459.51126</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">637.2688</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">663.32446</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-262.85788</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-113.99704</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-496.46606</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-276.3739</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-464.35291</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-117.7045</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame16">
+        <Real Name="X">0.032000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-232.70081</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-825.80219</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-145.10802</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5340157</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-31.26687</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-29.363522</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">309.21375</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">781.99701</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">124.53127</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-510.44098</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-103.85744</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-212.92839</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">203.17174</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-194.55887</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">398.26349</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">227.77353</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">373.35199</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-135.00497</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame17">
+        <Real Name="X">0.034000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-49.653511</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-626.61169</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-123.80679</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">20.231302</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-393.76401</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-91.801743</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">103.47707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">933.77759</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">166.89067</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-1119.6642</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-516.64929</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-707.92822</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">515.21558</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-101.95385</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">767.81323</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">529.88336</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">705.01288</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-10.806629</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame18">
+        <Real Name="X">0.035999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">712.54205</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">504.40082</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-136.87794</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-170.14798</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-487.76822</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-40.375179</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-473.05707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-106.50352</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">131.31868</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-696.66675</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-213.75543</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-361.87625</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">320.00208</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">227.69485</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">109.24284</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">306.78088</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">75.714462</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">298.8898</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame19">
+        <Real Name="X">0.037999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">1254.8397</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1169.5902</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-232.786</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-403.58868</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-363.20041</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">49.920265</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-781.54791</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-892.94739</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">138.38701</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">76.005096</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">290.72711</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">233.40591</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-72.914536</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">506.57452</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-740.65424</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-73.337982</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-710.96869</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">552.01038</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame20">
+        <Real Name="X">0.039999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">883.47449</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">501.11438</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-227.92537</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-366.05634</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-204.84132</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">60.92849</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-442.37555</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-376.2645</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">120.7158</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">92.873756</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">283.108</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">277.21378</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-101.71003</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">428.77969</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-697.12775</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-66.720261</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-632.11749</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">466.46158</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame21">
+        <Real Name="X">0.041999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-49.612621</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-713.79779</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-34.960567</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-27.154556</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-86.312614</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-25.959028</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">157.65372</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">729.94354</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">10.932293</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-619.19965</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-185.91602</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-173.58165</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">254.93802</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">14.515646</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">190.08441</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">282.9032</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">241.35138</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">33.75782</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame22">
+        <Real Name="X">0.044</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-657.97778</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-976.6814</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">172.2605</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">294.84616</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">69.191895</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-123.77532</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">445.32309</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">851.4942</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-100.31004</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-914.95563</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-375.09222</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-354.13535</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">423.36508</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-366.64685</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">782.43079</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">408.97772</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">797.5285</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-376.19067</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame23">
+        <Real Name="X">0.046</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-629.15894</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-59.983864</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">179.48286</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">322.60886</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">314.53378</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-151.40227</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">385.19714</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-295.90283</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-78.237907</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">-154.22195</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">125.53587</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">124.64846</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">44.17078</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-399.25381</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">320.72473</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">31.038414</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">314.88492</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-394.94788</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame24">
+        <Real Name="X">0.048</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-332.39575</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">664.15399</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">51.656132</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">128.3766</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">529.25647</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-117.1297</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">278.56876</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1227.2938</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">18.166134</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">887.68036</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">833.55298</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">770.10132</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-505.7196</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-216.18501</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-578.59351</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-456.83395</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-583.65576</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-143.95782</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame25">
+        <Real Name="X">0.050000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-202.89014</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">172.3596</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">39.227627</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-6.6218481</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">497.91492</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-84.875366</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">283.26016</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-709.70697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.77918053</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">1028.9786</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">973.97583</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">850.52496</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-586.10449</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-181.26808</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-737.09314</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-516.93854</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-753.46149</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-66.777283</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+    </AnalysisData>
+    <AnalysisData Name="v">
+      <DataFrame Name="Frame0">
+        <Real Name="X">0</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.071084008</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.028609246</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.021683823</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.82953632</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12428494</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.19813089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-3.3016868</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3098996</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6567938</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.54127192</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.21736306</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11774281</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6718037</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7322313</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.4552673</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6599941</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.170436</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.3892416</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame1">
+        <Real Name="X">0.0020000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.11716752</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.017394964</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.042094067</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.60906219</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.04430113</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16892648</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.7673712</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5605898</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2917739</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.54164028</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.22890832</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.10446271</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.7560548</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5305806</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0522399</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6055975</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.77789152</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1862004</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame2">
+        <Real Name="X">0.0040000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.27866712</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.018494025</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.10229634</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.27577752</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.16039085</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.14006341</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0553975</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">3.3395774</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.28552237</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.54295439</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.25984827</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.066436984</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.0326025</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.68903697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.35794133</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3845375</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.55073941</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.35984182</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame3">
+        <Real Name="X">0.0060000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.39098352</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.016036568</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.11418299</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1971352</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.014636949</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.40014401</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.1350756</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">3.1442547</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.33743685</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.53451979</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.23329121</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.080122463</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.1653903</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.29046515</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0540625</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.1779141</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1198531</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.57092619</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame4">
+        <Real Name="X">0.0080000004</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.38366598</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.044202667</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.066777237</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6308995</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.63230467</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0074387</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.60553694</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4974003</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6973701</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.52910805</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.13207367</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17281561</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.1316214</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.92296863</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.18145722</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2062889</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.19007707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.1673737</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame5">
+        <Real Name="X">0.0099999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.33438343</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.090627685</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.032273352</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5900655</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.3312393</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.602806</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2596558</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.024565697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.8701437</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.53104639</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.037549511</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2652629</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.093178</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.1374692</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0524777</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.363799</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0091476</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3691331</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame6">
+        <Real Name="X">0.012</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.34274369</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.054206021</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.060119953</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4345546</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4638183</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7491338</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.89214486</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.29390997</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.6336749</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.5147202</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.043858539</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25143108</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.0064623</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0698959</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.89617968</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2716563</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.84919214</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2449116</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame7">
+        <Real Name="X">0.014</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.38811392</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.026931137</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.11343038</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.3081858</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.89763331</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4069796</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.0099390149</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.9936705</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.5291512</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.4648855</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.14440803</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13034993</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.7180338</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.7165705</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.6222865</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.82563329</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.54793942</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.75611001</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame8">
+        <Real Name="X">0.016000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.35630661</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.044130743</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.12731384</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.9385522</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.086611599</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.93743247</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.085990578</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.9078319</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.93967491</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.41176751</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.23438743</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.01622821</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3194476</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.0034439266</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6720738</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.42140546</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.426115</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.10739604</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame9">
+        <Real Name="X">0.017999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.20781285</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.040428605</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.093718708</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12171274</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.45597395</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.66896474</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.5837939</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.9347758</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3159984</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.39488086</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.23947866</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.0019293651</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.080382</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.99515951</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0150967</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.43578458</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.68878114</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1654828</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame10">
+        <Real Name="X">0.02</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.05321835</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13198255</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.062021188</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.7755366</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.63373744</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.59874642</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-3.0756092</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.49396372</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.8665997</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.40196967</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.20022745</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.035853922</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0314382</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.8698499</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.34872067</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.66295952</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.64346921</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.0485435</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame11">
+        <Real Name="X">0.022</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.024770314</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11789898</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.070465304</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0947204</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.6659438</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.53510046</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-3.145026</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.61575496</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.8034077</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.38481158</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.19852787</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.036961026</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.9134438</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.1136348</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.51742637</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.57250345</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.78022265</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3354568</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame12">
+        <Real Name="X">0.024</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.12343206</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.013545688</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.098161317</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.5911603</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.6266669</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.38501012</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.9623634</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.1113114</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3272655</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.32801956</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.2344179</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.0084937587</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.6228618</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5115149</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.81760633</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.082642853</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.51307088</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.8365721</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame13">
+        <Real Name="X">0.026000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.2398327</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.048280206</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.10207509</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.26680222</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.30749667</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2709609</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.83765787</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.6753936</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2561387</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.29524046</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.23542711</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.01833803</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.52248758</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.54937172</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.9574323</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.20146504</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5893036</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.95909929</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame14">
+        <Real Name="X">0.028000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.28927046</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.00093491748</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.077677339</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.83365339</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.46699107</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.33329514</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.47579631</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0319532</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.8032777</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.34236902</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.15643857</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.062573686</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.97642708</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.11534566</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.444362</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.23733535</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0880574</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.28643337</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame15">
+        <Real Name="X">0.029999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.28518334</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.071866289</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.058680825</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.91626436</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4322549</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.52019638</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.4710561</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.1569121</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.3868082</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.43399301</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.044138394</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.18320292</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.7472622</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.38581657</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.05113703</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0737317</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.3262623</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.036751643</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame16">
+        <Real Name="X">0.032000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.29704931</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.045812696</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.066553958</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.85020095</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.0160193</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.63214475</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.14215896</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.4239016</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.5306249</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.47295162</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.013113554</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24449922</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.0989916</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.66487116</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.6175437</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.4159564</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.85928184</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.28515041</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame17">
+        <Real Name="X">0.034000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.32597479</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.061679859</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.084654458</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.88517225</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7493755</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.52991802</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.43671349</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.39329076</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.2399142</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.38286325</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.018168697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.19606568</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.4869106</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.040289</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.4851253</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.7537663</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16798037</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.5194872</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame18">
+        <Real Name="X">0.035999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.31070399</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.10724131</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.099593133</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.85485739</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.88496166</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.36080405</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.36881652</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.806416</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.9289925</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.2488447</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.078007147</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11283094</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.50239336</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0961232</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7828751</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2437073</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.3476634</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.40009791</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame19">
+        <Real Name="X">0.037999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.19902061</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.014159363</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.11964367</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.38517183</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.036485612</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.32907543</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.79717898</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0731707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6690929</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.18823588</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.087150089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.088101871</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.077369206</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.47608349</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.519912</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.64259887</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0495647</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.34607291</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame20">
+        <Real Name="X">0.039999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.046445318</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12077586</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.15009062</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.44237098</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.67365956</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.44772574</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.2508347</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.60017657</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3932115</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.20636216</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.045782201</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12430923</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.30119392</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.54302037</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.069943666</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.43710789</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.45781916</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4505155</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame21">
+        <Real Name="X">0.041999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.036352996</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15028481</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.18056007</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0584643</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0561837</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.55524057</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.9359157</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.81711137</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2504873</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.20670265</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.024917074</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15212363</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.36402199</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.2549965</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.0963452</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.47968698</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.3702705</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2704334</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame22">
+        <Real Name="X">0.044</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.0059976652</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.041411929</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.17747405</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.92650557</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.1611149</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.4498463</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-2.4241905</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.88327825</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.2946037</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.11222455</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.059167914</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11980146</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.28724965</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.0628339</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.31230456</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1652277</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.50227052</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.1004989</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame23">
+        <Real Name="X">0.046</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.079447858</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.057145286</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.15390538</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.287195</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.9103502</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.18013567</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.5455625</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.0933962</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.5013493</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.014609404</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.095052466</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.086196646</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.99938321</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.27287412</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1341605</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.839963</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.96032327</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.2903401</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame24">
+        <Real Name="X">0.048</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.14887403</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.03431683</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.13539279</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.26732114</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.16200057</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.10717887</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.84435308</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.90573382</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.6058874</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.030961242</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.055520307</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.1239015</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.79163504</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.43100691</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.2994416</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6337025</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.1133441</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.62512422</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame25">
+        <Real Name="X">0.050000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">-0.18416029</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.04255376</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.13095303</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.43255031</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.91286647</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.31994653</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.30245101</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.4575194</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-1.5566994</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.15617074</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.059565883</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22886707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.33611304</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.81006265</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.068371952</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.62638658</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">-0.2663753</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.42046183</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+    </AnalysisData>
+    <AnalysisData Name="x">
+      <DataFrame Name="Frame0">
+        <Real Name="X">0</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10701077</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6831927</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4730437</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16009073</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6150773</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4179697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17134975</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7290567</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5339396</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.25778386</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5047032</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3315074</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.28368345</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5191195</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2355678</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25658497</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4059143</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3494616</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame1">
+        <Real Name="X">0.0020000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10682248</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6832387</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4729798</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15865219</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6152458</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4183369</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16528071</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7339274</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5309913</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.25886676</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.504257</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3317297</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.28025553</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5223821</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2330604</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25331944</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4039661</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3520367</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame2">
+        <Real Name="X">0.0040000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10634984</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6832192</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4728041</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15871194</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6150132</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4186132</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16229735</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7402393</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5299525</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.25995323</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5037502</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3318803</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.27632764</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5242366</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2330434</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25042513</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4043866</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.35322</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame3">
+        <Real Name="X">0.0060000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.1056096</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6831775</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4725721</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16068374</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6148435</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4192336</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16175486</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7468281</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5295045</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26102728</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5032595</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3320231</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.27203467</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5241246</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2349935</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24798545</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4065303</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3525207</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame4">
+        <Real Name="X">0.0080000004</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10482587</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6832315</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4724109</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16380249</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6157379</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4209158</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16090542</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7507669</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5268829</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26208684</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5029387</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3323154</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.26774511</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.522537</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.235956</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24562025</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4075243</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3504307</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame5">
+        <Real Name="X">0.0099999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.1041351</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6833973</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4723358</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16704148</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6180878</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4238575</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15863292</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7513238</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5215948</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26314813</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5028244</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3328075</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.26354319</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5203263</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2343845</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24296486</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4060162</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3477499</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame6">
+        <Real Name="X">0.012</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10346323</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6835349</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4722369</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.16998301</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.621045</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4273539</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15652169</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.751488</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5160244</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26419002</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5027552</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3333344</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25946847</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5181216</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2322834</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24032451</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4040203</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3451567</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame7">
+        <Real Name="X">0.014</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10270759</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6835204</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4720352</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17266926</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6231918</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4303827</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15612</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7545769</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5123959</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26514804</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5025231</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3336635</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2558606</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5164696</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2326927</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23842208</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4043565</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3433504</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame8">
+        <Real Name="X">0.016000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10196327</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6834272</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4717803</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17478439</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6237626</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4324813</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15619461</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7601607</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5103502</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26599541</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5020909</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.333744</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25302616</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5160701</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2356939</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23741561</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4069481</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3430929</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame9">
+        <Real Name="X">0.017999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10146289</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6834564</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4715726</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17548393</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6230708</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4339204</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.15389316</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7647156</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5079963</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26678827</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5016038</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3337369</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.25077733</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5175481</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2382548</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23660628</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4088796</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3448896</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame10">
+        <Real Name="X">0.02</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10128853</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6836826</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4714365</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17434806</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6218579</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4351397</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.14836892</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7663301</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5044923</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26758879</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.501184</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3337891</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24869993</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5208993</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2381966</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23538552</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4082075</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3485956</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame11">
+        <Real Name="X">0.022</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10124445</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6839411</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4713049</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17221706</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6205386</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.43625</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.14191461</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7672452</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.5007699</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26837146</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5007941</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3338704</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24679185</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5251042</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2370219</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23413423</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4064994</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3532133</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame12">
+        <Real Name="X">0.024</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10105705</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6840243</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4711218</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17069675</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6192489</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4371016</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13732137</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7706723</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.497879</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.2690579</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5003442</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3338778</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24539392</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5285168</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2378798</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2337019</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4067781</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3572199</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame13">
+        <Real Name="X">0.026000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10063045</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6839454</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4709151</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17080212</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6184214</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4376845</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13516311</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7760024</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4954185</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.26965684</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4998647</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3338361</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24435376</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5300944</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2413785</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.234035</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4095682</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3595839</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame14">
+        <Real Name="X">0.028000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.10006683</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6839112</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4707458</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.1722496</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6189152</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4382954</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13412157</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7791226</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4921377</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27030763</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4995033</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.33391</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24270052</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5301347</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2447429</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23387267</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4122015</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3604436</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame15">
+        <Real Name="X">0.029999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.099491753</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6840261</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4706218</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17408884</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6213089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4392388</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13317038</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.777789</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4876144</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27113041</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4993604</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3342175</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2395875</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5294707</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2453914</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23213851</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4122564</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.360502</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame16">
+        <Real Name="X">0.032000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.098910764</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6841453</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4704962</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17580761</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6251193</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4404643</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13266389</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7747629</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4825823</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27206609</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4993693</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3346868</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23548047</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.528307</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2442303</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22937465</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4106102</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3600633</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame17">
+        <Real Name="X">0.034000002</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.098273195</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6840779</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.470336</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.1775455</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6288537</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4415972</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.1332652</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.774508</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4779353</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27289</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4993578</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.335114</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23209612</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5264088</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.244493</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22743089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4102893</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3591247</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame18">
+        <Real Name="X">0.035999998</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.097633414</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6838697</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4701438</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17930561</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6310974</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4423969</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.13417338</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.777634</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.473932</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27345175</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4992294</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3353786</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23061794</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5241712</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2475228</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22744651</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4125043</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3581944</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame19">
+        <Real Name="X">0.037999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.097168222</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6837798</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4699159</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.18037684</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.631462</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4430466</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.1332757</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7804079</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4704642</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27384529</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.499051</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.335557</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23035564</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5228249</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2509339</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22863716</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4149766</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3584371</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame20">
+        <Real Name="X">0.039999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.097001188</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6839595</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4696314</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17991926</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6303915</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4438729</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12945235</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.779995</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4675391</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27424464</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4989362</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.335784</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22990473</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5233943</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2516491</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22964412</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4148631</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3607812</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame21">
+        <Real Name="X">0.041999999</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.097046316</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6842619</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4692867</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17805527</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6284584</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4449363</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.12382673</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7782044</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4650152</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27466351</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4988831</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3360777</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22913861</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5256178</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2497914</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23049472</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4124079</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.364965</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame22">
+        <Real Name="X">0.044</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.097085565</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6844089</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4689267</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17604336</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6261555</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4459157</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11862303</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7789947</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.462481</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27494374</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4987875</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3363388</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.22931476</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.52795</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2485714</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.2324203</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4107748</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3693693</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame23">
+        <Real Name="X">0.046</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.09697099</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6843321</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.468606</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17512217</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6241527</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4464231</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11509506</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7828162</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4595857</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27501339</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4986099</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3365228</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23102139</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.528922</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2501695</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23583122</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4120241</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3723869</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame24">
+        <Real Name="X">0.048</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.096703343</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6842369</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.468328</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17542236</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6233923</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4463458</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11308729</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7855217</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4564006</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27504933</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4984671</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3367407</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23285623</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5283676</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2529213</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23933567</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4144101</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3739107</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+      <DataFrame Name="Frame25">
+        <Real Name="X">0.050000001</Real>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">0</Int>
+          <DataValue>
+            <Real Name="Value">0.09634953</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6842866</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.468065</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.17624958</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.6246684</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4458025</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.11221685</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.7837523</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.4532561</Real>
+          </DataValue>
+        </DataValues>
+        <DataValues>
+          <Int Name="Count">9</Int>
+          <Int Name="DataSet">1</Int>
+          <DataValue>
+            <Real Name="Value">0.27529195</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.4985232</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3371418</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.23281005</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.5269121</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.2535784</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">0.24114256</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">1.414678</Real>
+          </DataValue>
+          <DataValue>
+            <Real Name="Value">2.3748136</Real>
+          </DataValue>
+        </DataValues>
+      </DataFrame>
+    </AnalysisData>
+  </OutputData>
+  <OutputFiles Name="Files">
+    <File Name="-ox"></File>
+    <File Name="-ov"></File>
+    <File Name="-of"></File>
+  </OutputFiles>
+</ReferenceData>
