@@ -77,6 +77,53 @@ TEST_F(Simd4VectorOperationsTest, norm2)
 
 #    endif // GMX_SIMD4_HAVE_REAL
 
+/* norm2() is defined as a fixed chain of fma() operations, so with hardware FMA it must
+ * give bitwise-identical results with every compiler, independent of its floating-point
+ * contraction setting. See the SimdVectorOperationsFmaTest tests for details; the inputs
+ * are the same.
+ */
+#    if GMX_SIMD4_HAVE_FLOAT
+TEST(Simd4VectorOperationsFmaTest, norm2FloatMatchesFmaChain)
+{
+    if (!GMX_SIMD_HAVE_FMA)
+    {
+        GTEST_SKIP() << "No hardware FMA in this SIMD implementation";
+    }
+    const float          s    = 1.0F / 4096.0F; // 2^-12
+    volatile const float in[] = { 1 - 19 * s, 1 + 15 * s, 1 + 25 * s };
+    const float          x = in[0], y = in[1], z = in[2];
+
+    const float       ref = std::fma(z, z, std::fma(y, y, x * x));
+    alignas(64) float buf[GMX_SIMD4_WIDTH];
+    store4(buf, norm2(Simd4Float(x), Simd4Float(y), Simd4Float(z)));
+    for (int i = 0; i < GMX_SIMD4_WIDTH; i++)
+    {
+        EXPECT_EQ(ref, buf[i]) << "element " << i;
+    }
+}
+#    endif // GMX_SIMD4_HAVE_FLOAT
+
+#    if GMX_SIMD4_HAVE_DOUBLE
+TEST(Simd4VectorOperationsFmaTest, norm2DoubleMatchesFmaChain)
+{
+    if (!GMX_SIMD_HAVE_FMA)
+    {
+        GTEST_SKIP() << "No hardware FMA in this SIMD implementation";
+    }
+    const double          s    = 1.0 / 268435456.0; // 2^-28
+    volatile const double in[] = { 1 + 64 * s, 1 - 67 * s, 1 - 63 * s };
+    const double          x = in[0], y = in[1], z = in[2];
+
+    const double       ref = std::fma(z, z, std::fma(y, y, x * x));
+    alignas(64) double buf[GMX_SIMD4_WIDTH];
+    store4(buf, norm2(Simd4Double(x), Simd4Double(y), Simd4Double(z)));
+    for (int i = 0; i < GMX_SIMD4_WIDTH; i++)
+    {
+        EXPECT_EQ(ref, buf[i]) << "element " << i;
+    }
+}
+#    endif // GMX_SIMD4_HAVE_DOUBLE
+
 /*! \} */
 /*! \endcond */
 
