@@ -117,6 +117,8 @@ public:
      */
     void initFrame();
 
+    //! Returns the number of threads requested for analyzing frames.
+    int threadCount() const;
     //! Returns true if input data comes from a trajectory.
     bool hasTrajectory() const;
     //! Returns the topology information object.

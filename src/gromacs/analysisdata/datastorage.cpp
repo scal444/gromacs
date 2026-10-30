@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -184,11 +185,17 @@ public:
      * \todo
      * This could be extended to non-multipoint data as well.
      *
+     * The value is computed when the data is started, because it is
+     * queried concurrently from multiple threads during parallel
+     * processing.
+     *
      * Does not throw.
      */
-    bool needStorage() const
+    bool needStorage() const { return bNeedStorage_; }
+    //! Computes the value returned by needStorage() after the data is started.
+    void initNeedStorage()
     {
-        return storageLimit_ > 0 || (pendingLimit_ > 1 && modules_->hasSerialModules());
+        bNeedStorage_ = storageLimit_ > 0 || (pendingLimit_ > 1 && modules_->hasSerialModules());
     }
     //! Implementation for AnalysisDataStorage::finishFrame().
     void finishFrame(int index);
@@ -241,7 +248,7 @@ public:
      * There is always one unused frame in the buffer, which is initialized
      * such that when \a firstFrameLocation_ is incremented, it becomes
      * valid.  This makes it easier to rotate the buffer in concurrent
-     * access scenarions (which are not yet otherwise implemented).
+     * access scenarios.
      */
     FrameList frames_;
     //! Location of oldest frame in \a frames_.
@@ -266,6 +273,21 @@ public:
      * frame (see \a frames_).
      */
     int nextIndex_;
+    //! Value returned by needStorage().
+    bool bNeedStorage_;
+    /*! \brief
+     * Guards the frame bookkeeping against concurrent access.
+     *
+     * When frames are analyzed in parallel, startFrame() and finishFrame()
+     * are called from worker threads while finishFrameSerial() (and the
+     * serial module notifications it triggers, which may query stored
+     * frames) runs on another thread.  Point values are written into
+     * per-frame builders and do not need the lock.
+     *
+     * The mutex is recursive because serial modules notified from
+     * finishFrameSerial() may call back into tryGetDataFrame().
+     */
+    mutable std::recursive_mutex mutex_;
 };
 
 /********************************************************************
@@ -395,7 +417,8 @@ AnalysisDataStorageImpl::AnalysisDataStorageImpl() :
     pendingLimit_(1),
     firstFrameLocation_(0),
     firstUnnotifiedIndex_(0),
-    nextIndex_(0)
+    nextIndex_(0),
+    bNeedStorage_(false)
 {
 }
 
@@ -482,7 +505,8 @@ AnalysisDataFrameBuilderPointer AnalysisDataStorageImpl::getFrameBuilder()
 
 void AnalysisDataStorageImpl::finishFrame(int index)
 {
-    const int storageIndex = computeStorageLocation(index);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const int                             storageIndex = computeStorageLocation(index);
     GMX_RELEASE_ASSERT(storageIndex >= 0, "Out of bounds frame index");
 
     AnalysisDataStorageFrameData& storedFrame = *frames_[storageIndex];
@@ -501,8 +525,17 @@ void AnalysisDataStorageImpl::finishFrame(int index)
 
 void AnalysisDataStorageImpl::finishFrameSerial(int index)
 {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const int                             storageIndex = computeStorageLocation(index);
+    // A frame that was never started was not produced by the data source
+    // (e.g., a data set that is not written for input without velocities).
+    // Skip it, matching serial processing where no notifications are
+    // generated for frames that are not started.
+    if (pendingLimit_ > 1 && (storageIndex < 0 || !frames_[storageIndex]->isStarted()))
+    {
+        return;
+    }
     GMX_RELEASE_ASSERT(index == firstUnnotifiedIndex_, "Out of order finisFrameSerial() calls");
-    const int storageIndex = computeStorageLocation(index);
     GMX_RELEASE_ASSERT(storageIndex >= 0, "Out of bounds frame index");
 
     AnalysisDataStorageFrameData& storedFrame = *frames_[storageIndex];
@@ -738,13 +771,15 @@ AnalysisDataStorage::~AnalysisDataStorage() {}
 
 int AnalysisDataStorage::frameCount() const
 {
+    std::lock_guard<std::recursive_mutex> lock(impl_->mutex_);
     return impl_->firstUnnotifiedIndex();
 }
 
 
 AnalysisDataFrameRef AnalysisDataStorage::tryGetDataFrame(int index) const
 {
-    int storageIndex = impl_->computeStorageLocation(index);
+    std::lock_guard<std::recursive_mutex> lock(impl_->mutex_);
+    int                                   storageIndex = impl_->computeStorageLocation(index);
     if (storageIndex == -1)
     {
         return AnalysisDataFrameRef();
@@ -764,14 +799,16 @@ bool AnalysisDataStorage::requestStorage(int nframes)
     if (nframes == -1)
     {
         impl_->storageLimit_ = std::numeric_limits<int>::max();
-        return true;
     }
     // Check whether an earlier call has requested more storage.
-    if (nframes < impl_->storageLimit_)
+    else if (nframes > impl_->storageLimit_)
     {
-        return true;
+        impl_->storageLimit_ = nframes;
     }
-    impl_->storageLimit_ = nframes;
+    if (impl_->modules_ != nullptr)
+    {
+        impl_->initNeedStorage();
+    }
     return true;
 }
 
@@ -782,6 +819,7 @@ void AnalysisDataStorage::startDataStorage(AbstractAnalysisData* data, AnalysisD
     // Data needs to be set before calling extendBuffer()
     impl_->data_    = data;
     impl_->modules_ = modules;
+    impl_->initNeedStorage();
     if (!impl_->storeAll())
     {
         // 2 = pending limit (1) + 1
@@ -800,6 +838,7 @@ void AnalysisDataStorage::startParallelDataStorage(AbstractAnalysisData*        
     // Data needs to be set before calling extendBuffer()
     impl_->data_    = data;
     impl_->modules_ = modules;
+    impl_->initNeedStorage();
     if (!impl_->storeAll())
     {
         impl_->extendBuffer(impl_->storageLimit_ + pendingLimit + 1);
@@ -809,6 +848,7 @@ void AnalysisDataStorage::startParallelDataStorage(AbstractAnalysisData*        
 
 AnalysisDataStorageFrame& AnalysisDataStorage::startFrame(const AnalysisDataFrameHeader& header)
 {
+    std::lock_guard<std::recursive_mutex> lock(impl_->mutex_);
     GMX_ASSERT(header.isValid(), "Invalid header");
     internal::AnalysisDataStorageFrameData* storedFrame = nullptr;
     if (impl_->storeAll())
@@ -850,7 +890,8 @@ AnalysisDataStorageFrame& AnalysisDataStorage::startFrame(int index, real x, rea
 
 AnalysisDataStorageFrame& AnalysisDataStorage::currentFrame(int index)
 {
-    const int storageIndex = impl_->computeStorageLocation(index);
+    std::lock_guard<std::recursive_mutex> lock(impl_->mutex_);
+    const int                             storageIndex = impl_->computeStorageLocation(index);
     GMX_RELEASE_ASSERT(storageIndex >= 0, "Out of bounds frame index");
 
     internal::AnalysisDataStorageFrameData& storedFrame = *impl_->frames_[storageIndex];
@@ -878,6 +919,7 @@ void AnalysisDataStorage::finishFrameSerial(int index)
 
 void AnalysisDataStorage::finishDataStorage()
 {
+    std::lock_guard<std::recursive_mutex> lock(impl_->mutex_);
     // TODO: Check that all frames have been finished etc.
     impl_->builders_.clear();
     impl_->modules_->notifyDataFinish();

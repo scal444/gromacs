@@ -44,6 +44,7 @@
 
 #include <cstdio>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -155,6 +156,27 @@ bool SelectionData::initCoveredFraction(e_coverfrac_t type)
     coveredFraction_        = bDynamicCoveredFraction_ ? 0.0 : 1.0;
     averageCoveredFraction_ = coveredFraction_;
     return type == CFRAC_NONE || coveredFractionType_ != CFRAC_NONE;
+}
+
+void SelectionData::copyPostCompilationState(const SelectionData& source)
+{
+    GMX_RELEASE_ASSERT(posCount() == source.posCount(),
+                       "Copied selection has different number of positions");
+    gmx_ana_indexmap_t&       map       = rawPositions_.m;
+    const gmx_ana_indexmap_t& sourceMap = source.rawPositions_.m;
+    GMX_RELEASE_ASSERT(map.b.nr == sourceMap.b.nr, "Copied selection has different blocks");
+    std::copy(sourceMap.orgid, sourceMap.orgid + sourceMap.b.nr, map.orgid);
+    std::copy(sourceMap.mapid, sourceMap.mapid + posCount(), map.mapid);
+    initCoveredFraction(source.coveredFractionType_);
+}
+
+
+void SelectionData::addCoveredFractionSum(const SelectionData& other)
+{
+    if (isCoveredFractionDynamic() && other.isCoveredFractionDynamic())
+    {
+        averageCoveredFraction_ += other.averageCoveredFraction_;
+    }
 }
 
 namespace

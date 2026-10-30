@@ -54,6 +54,7 @@
 #include <string>
 
 #include "gromacs/selection/indexutil.h"
+#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/classhelpers.h"
 #include "gromacs/utility/real.h"
 
@@ -394,6 +395,21 @@ public:
      */
     void resolveIndexGroupReference(gmx_ana_indexgrps_t* grps, int natoms);
     /*! \brief
+     * Resolves an unresolved reference to an index group to a known group.
+     *
+     * \param[in] atoms     Atoms in the group.
+     * \param[in] groupName Name of the group.
+     * \param[in] natoms    Maximum number of atoms the selections can evaluate to
+     *     (zero if the topology/atom count is not set yet).
+     * \throws    std::bad_alloc if out of memory.
+     * \throws    InconsistentInputError if the group is not valid.
+     *
+     * Used to resolve references in copies of a selection collection the
+     * same way as in the original, after the index groups are no longer
+     * available.
+     */
+    void resolveIndexGroupReference(ArrayRef<const int> atoms, const std::string& groupName, int natoms);
+    /*! \brief
      * Checks that an index group has valid atom indices.
      *
      * \param[in] natoms Maximum number of atoms the selections can evaluate to.
@@ -401,6 +417,7 @@ public:
      * \throws    InconsistentInputError if there are invalid atom indices.
      */
     void checkIndexGroup(int natoms);
+
 
     //! Type of the element.
     e_selelem_t type;
@@ -480,6 +497,13 @@ public:
     SelectionTreeElementPointer next;
 
 private:
+    /*! \brief
+     * Replaces an index group reference with a constant group.
+     *
+     * Takes ownership of the memory in \p group.
+     */
+    void setResolvedIndexGroup(gmx_ana_index_t group, const std::string& groupName, int natoms);
+
     /*! \brief
      * Name of the element.
      *

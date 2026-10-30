@@ -51,6 +51,7 @@
 #include "gromacs/analysisdata/abstractdata.h"
 #include "gromacs/analysisdata/analysisdata.h"
 #include "gromacs/selection/selection.h"
+#include "gromacs/selection/selectioncollection.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/gmxassert.h"
 
@@ -190,14 +191,17 @@ AnalysisDataHandle TrajectoryAnalysisModuleData::dataHandle(const AnalysisData& 
 }
 
 
-Selection TrajectoryAnalysisModuleData::parallelSelection(const Selection& selection)
+Selection TrajectoryAnalysisModuleData::parallelSelection(const Selection& selection) const
 {
-    // TODO: Implement properly.
-    return selection;
+    if (!selection.isValid())
+    {
+        return selection;
+    }
+    return impl_->selections_.correspondingSelection(selection);
 }
 
 
-SelectionList TrajectoryAnalysisModuleData::parallelSelections(const SelectionList& selections)
+SelectionList TrajectoryAnalysisModuleData::parallelSelections(const SelectionList& selections) const
 {
     // TODO: Consider an implementation that does not allocate memory every time.
     SelectionList newSelections;

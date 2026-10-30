@@ -44,6 +44,7 @@
 
 #include <cstring>
 
+#include <algorithm>
 #include <filesystem>
 
 #include "gromacs/selection/indexutil.h"
@@ -442,15 +443,34 @@ void SelectionTreeElement::resolveIndexGroupReference(gmx_ana_indexgrps_t* grps,
         }
     }
 
-    if (!gmx_ana_index_check_sorted(&foundGroup))
+    setResolvedIndexGroup(foundGroup, foundName, natoms);
+}
+
+void SelectionTreeElement::resolveIndexGroupReference(ArrayRef<const int> atoms,
+                                                      const std::string&  groupName,
+                                                      int                 natoms)
+{
+    GMX_RELEASE_ASSERT(type == SEL_GROUPREF,
+                       "Should only be called for index group reference elements");
+    gmx_ana_index_t group;
+    int*            index = nullptr;
+    snew(index, atoms.size());
+    std::copy(atoms.begin(), atoms.end(), index);
+    gmx_ana_index_set(&group, atoms.ssize(), index, atoms.ssize());
+    setResolvedIndexGroup(group, groupName, natoms);
+}
+
+void SelectionTreeElement::setResolvedIndexGroup(gmx_ana_index_t group, const std::string& groupName, int natoms)
+{
+    if (!gmx_ana_index_check_sorted(&group))
     {
         flags |= SEL_UNSORTED;
     }
 
     sfree(u.gref.name);
     type = SEL_CONST;
-    gmx_ana_index_set(&u.cgrp, foundGroup.isize, foundGroup.index, foundGroup.nalloc_index);
-    setName(foundName);
+    gmx_ana_index_set(&u.cgrp, group.isize, group.index, group.nalloc_index);
+    setName(groupName);
 
     if (natoms > 0)
     {

@@ -129,6 +129,7 @@ void Trajectory::initOptions(IOptionsContainer* options, TrajectoryAnalysisSetti
     };
 
     settings->setHelpText(desc);
+    settings->setFlag(TrajectoryAnalysisSettings::efFrameParallel);
 
     options->addOption(FileNameOption("ox")
                                .filetype(OptionFileType::Plot)
@@ -263,16 +264,18 @@ void analyzeFrameImpl(int frnr, const t_trxframe& fr, AnalysisDataHandle* dh, co
 
 void Trajectory::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* /* pbc */, TrajectoryAnalysisModuleData* pdata)
 {
-    AnalysisDataHandle   dh  = pdata->dataHandle(xdata_);
-    const SelectionList& sel = TrajectoryAnalysisModuleData::parallelSelections(sel_);
-    analyzeFrameImpl(frnr, fr, &dh, sel, [](const SelectionPosition& pos) { return pos.x(); });
+    const SelectionList& sel = pdata->parallelSelections(sel_);
+    AnalysisDataHandle   dhx = pdata->dataHandle(xdata_);
+    analyzeFrameImpl(frnr, fr, &dhx, sel, [](const SelectionPosition& pos) { return pos.x(); });
     if (fr.bV)
     {
-        analyzeFrameImpl(frnr, fr, &dh, sel, [](const SelectionPosition& pos) { return pos.v(); });
+        AnalysisDataHandle dhv = pdata->dataHandle(vdata_);
+        analyzeFrameImpl(frnr, fr, &dhv, sel, [](const SelectionPosition& pos) { return pos.v(); });
     }
     if (fr.bF)
     {
-        analyzeFrameImpl(frnr, fr, &dh, sel, [](const SelectionPosition& pos) { return pos.f(); });
+        AnalysisDataHandle dhf = pdata->dataHandle(fdata_);
+        analyzeFrameImpl(frnr, fr, &dhf, sel, [](const SelectionPosition& pos) { return pos.f(); });
     }
 }
 

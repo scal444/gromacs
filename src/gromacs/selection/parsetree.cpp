@@ -917,7 +917,7 @@ SelectionTreeElementPointer _gmx_sel_init_group_by_name(const char* name, yyscan
     {
         gmx_ana_indexgrps_t*     grps = _gmx_sel_lexer_indexgrps(scanner);
         gmx_ana_selcollection_t* sc   = _gmx_sel_lexer_selcollection(scanner);
-        sel->resolveIndexGroupReference(grps, sc->gall.isize);
+        sc->resolveIndexGroupReference(sel.get(), grps);
     }
 
     return sel;
@@ -941,7 +941,7 @@ SelectionTreeElementPointer _gmx_sel_init_group_by_id(int id, yyscan_t scanner)
     {
         gmx_ana_indexgrps_t*     grps = _gmx_sel_lexer_indexgrps(scanner);
         gmx_ana_selcollection_t* sc   = _gmx_sel_lexer_selcollection(scanner);
-        sel->resolveIndexGroupReference(grps, sc->gall.isize);
+        sc->resolveIndexGroupReference(sel.get(), grps);
     }
 
     return sel;
