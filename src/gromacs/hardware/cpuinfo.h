@@ -42,6 +42,8 @@
 #ifndef GMX_HARDWARE_CPUINFO_H
 #define GMX_HARDWARE_CPUINFO_H
 
+#include <cstdint>
+
 #include <map>
 #include <set>
 #include <string>
@@ -296,6 +298,37 @@ bool cpuIsAmdZen1(const CpuInfo& cpuInfo);
  * \returns  True if running on Neoverse V2
  */
 bool cpuIsNeoverseV2(const CpuInfo& cpuInfo);
+
+namespace detail
+{
+
+/*! \brief Return \p features without the x86 features that the OS has not enabled
+ *
+ * The cpuid feature bits for AVX and AVX-512 only say that the processor
+ * implements the instructions. The instructions can only be used if the OS
+ * also saves and restores the corresponding registers, which it reports with
+ * the OSXSAVE cpuid bit and the XCR0 register. If that is not the case (e.g.
+ * some hypervisors, or a Linux kernel booted with noxsave), executing the
+ * instructions raises an invalid-opcode exception.
+ *
+ * Without the SSE and AVX state (XCR0 bits 1 and 2) all VEX- and EVEX-encoded
+ * features are removed: AVX, AVX2, FMA, FMA4, XOP, F16C and all AVX-512 features.
+ * Without the AVX-512 opmask and ZMM state (XCR0 bits 5, 6 and 7) all AVX-512
+ * features are removed.
+ *
+ * This is a pure function of its arguments, so it can be tested without the hardware.
+ *
+ * \param features  Feature set as reported by cpuid
+ * \param osXsave   Whether cpuid reports OSXSAVE (leaf 0x1, ecx bit 27)
+ * \param xcr0      Value of XCR0, only used when \p osXsave is true
+ *
+ * \returns  The features that can actually be used
+ */
+std::set<CpuInfo::Feature> filterX86FeaturesByOsSupport(const std::set<CpuInfo::Feature>& features,
+                                                        bool                              osXsave,
+                                                        uint64_t                          xcr0);
+
+} // namespace detail
 
 } // namespace gmx
 

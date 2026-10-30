@@ -223,6 +223,26 @@ int executeX86CpuID(unsigned int gmx_unused level,
 }
 
 
+/*! \brief Read the x86 XCR0 register (OS-enabled extended processor state) with xgetbv
+ *
+ *  Must only be called when cpuid reports OSXSAVE (leaf 0x1, ecx bit 27), since
+ *  xgetbv raises an invalid-opcode exception otherwise.
+ *
+ *  \return The value of XCR0, or 0 if xgetbv cannot be executed.
+ */
+uint64_t readX86Xcr0()
+{
+#if (GMX_IS_X86_32 || GMX_IS_X86_64) && (defined __GNUC__ || GMX_X86_GCC_INLINE_ASM)
+    unsigned int eax, edx;
+    __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(0));
+    return (static_cast<uint64_t>(edx) << 32) | eax;
+#elif defined _MSC_VER && (defined _M_IX86 || defined _M_X64)
+    return static_cast<uint64_t>(_xgetbv(0));
+#else
+    return 0;
+#endif
+}
+
 /*! \brief Detect x86 vendors by using the cpuid assembly instructions
  *
  *  If support for the cpuid instruction is present, we check for Intel,
@@ -342,10 +362,13 @@ void detectX86Features(std::string* brand, int* family, int* model, int* steppin
         return;
     }
     unsigned int maxStdLevel = eax;
+    bool         osXsave     = false;
 
     if (maxStdLevel >= 0x1)
     {
         executeX86CpuID(0x1, 0, &eax, &ebx, &ecx, &edx);
+
+        osXsave = ((ecx >> 27) & 1U) != 0;
 
         *family   = ((eax & 0x0ff00000) >> 20) + ((eax & 0x00000f00) >> 8);
         *model    = ((eax & 0x000f0000) >> 12) + ((eax & 0x000000f0) >> 4);
@@ -396,6 +419,7 @@ void detectX86Features(std::string* brand, int* family, int* model, int* steppin
     if (executeX86CpuID(0x80000000, 0, &eax, &ebx, &ecx, &edx) != 0)
     {
         // No point in continuing if we don't support any extended levels
+        *features = detail::filterX86FeaturesByOsSupport(*features, osXsave, osXsave ? readX86Xcr0() : 0);
         return;
     }
     unsigned int maxExtLevel = eax;
@@ -464,6 +488,8 @@ void detectX86Features(std::string* brand, int* family, int* model, int* steppin
 
         setFeatureFromBit(features, CpuInfo::Feature::X86_NonstopTsc, edx, 8);
     }
+
+    *features = detail::filterX86FeaturesByOsSupport(*features, osXsave, osXsave ? readX86Xcr0() : 0);
 }
 
 /*! \brief internal structure to return os logical cpu id together with APIC info for it */
@@ -998,6 +1024,54 @@ void detectProcCpuInfo(CpuInfo::Vendor*            vendor,
 }
 /*! \endcond */
 } // namespace
+
+namespace detail
+{
+
+std::set<CpuInfo::Feature> filterX86FeaturesByOsSupport(const std::set<CpuInfo::Feature>& features,
+                                                        const bool                        osXsave,
+                                                        const uint64_t                    xcr0)
+{
+    // XCR0 bits 1 and 2: SSE (XMM) and AVX (upper YMM) state
+    const uint64_t xcr0AvxState = (1U << 1) | (1U << 2);
+    // XCR0 bits 5, 6 and 7: AVX-512 opmask, upper ZMM0-15 and ZMM16-31 state
+    const uint64_t xcr0Avx512State = (1U << 5) | (1U << 6) | (1U << 7);
+
+    const bool haveOsAvx    = osXsave && (xcr0 & xcr0AvxState) == xcr0AvxState;
+    const bool haveOsAvx512 = haveOsAvx && (xcr0 & xcr0Avx512State) == xcr0Avx512State;
+
+    std::set<CpuInfo::Feature> result = features;
+    if (!haveOsAvx512)
+    {
+        for (const auto feature : { CpuInfo::Feature::X86_Avx512F,
+                                    CpuInfo::Feature::X86_Avx512PF,
+                                    CpuInfo::Feature::X86_Avx512ER,
+                                    CpuInfo::Feature::X86_Avx512CD,
+                                    CpuInfo::Feature::X86_Avx512BW,
+                                    CpuInfo::Feature::X86_Avx512VL,
+                                    CpuInfo::Feature::X86_Avx512BF16,
+                                    CpuInfo::Feature::X86_Avx512secondFMA })
+        {
+            result.erase(feature);
+        }
+    }
+    if (!haveOsAvx)
+    {
+        // All VEX-encoded instructions need the AVX state, including FMA, FMA4, XOP and F16C
+        for (const auto feature : { CpuInfo::Feature::X86_Avx,
+                                    CpuInfo::Feature::X86_Avx2,
+                                    CpuInfo::Feature::X86_Fma,
+                                    CpuInfo::Feature::X86_Fma4,
+                                    CpuInfo::Feature::X86_Xop,
+                                    CpuInfo::Feature::X86_F16C })
+        {
+            result.erase(feature);
+        }
+    }
+    return result;
+}
+
+} // namespace detail
 
 
 // static
