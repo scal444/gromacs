@@ -275,11 +275,7 @@ static inline SimdDouble gmx_simdcall round(SimdDouble x)
 
 static inline SimdDouble gmx_simdcall trunc(SimdDouble x)
 {
-#if defined(__INTEL_COMPILER) || defined(__ECC)
-    return { _mm512_trunc_pd(x.simdInternal_) };
-#else
-    return { _mm512_cvtepi32_pd(_mm512_cvttpd_epi32(x.simdInternal_)) };
-#endif
+    return { _mm512_roundscale_pd(x.simdInternal_, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC) };
 }
 
 template<MathOptimization opt = MathOptimization::Safe>

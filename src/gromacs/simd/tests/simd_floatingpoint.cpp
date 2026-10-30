@@ -237,6 +237,34 @@ TEST_F(SimdFloatingpointTest, trunc)
     GMX_EXPECT_SIMD_REAL_EQ(setSimdRealFrom1R(-3), trunc(rSimd_m3p75));
 }
 
+// trunc() must accept any floating-point value, not only values that fit in
+// a 32-bit integer. Implementations that convert via int32 get this wrong.
+TEST_F(SimdFloatingpointTest, truncLargeAndNonFinite)
+{
+    const real inf = std::numeric_limits<real>::infinity();
+    const real nan = std::numeric_limits<real>::quiet_NaN();
+    // 2^31 and 3e9 are exactly representable in single and double precision
+    const std::vector<real> input = { 2147483648.0, -2147483648.0, 3.0e9, -3.0e9, 1.0e20,
+                                      -1.0e30,      inf,           -inf,  nan };
+
+    for (const real x : input)
+    {
+        const real              ref = std::trunc(x);
+        const std::vector<real> tst = simdReal2Vector(trunc(SimdReal(x)));
+        for (const real t : tst)
+        {
+            if (std::isnan(ref))
+            {
+                EXPECT_TRUE(std::isnan(t)) << "trunc(" << x << ") returned " << t;
+            }
+            else
+            {
+                EXPECT_EQ(ref, t) << "trunc(" << x << ") returned " << t;
+            }
+        }
+    }
+}
+
 // We explicitly test the exponent/mantissa routines with double precision data,
 // since these usually rely on direct manipulation and shift of the SIMD registers,
 // where it is easy to make mistakes with single vs double precision.

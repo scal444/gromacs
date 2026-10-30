@@ -275,11 +275,7 @@ static inline SimdFloat gmx_simdcall round(SimdFloat x)
 
 static inline SimdFloat gmx_simdcall trunc(SimdFloat x)
 {
-#if defined(__INTEL_COMPILER) || defined(__ECC)
-    return { _mm512_trunc_ps(x.simdInternal_) };
-#else
-    return { _mm512_cvtepi32_ps(_mm512_cvttps_epi32(x.simdInternal_)) };
-#endif
+    return { _mm512_roundscale_ps(x.simdInternal_, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC) };
 }
 
 template<MathOptimization opt = MathOptimization::Safe>
