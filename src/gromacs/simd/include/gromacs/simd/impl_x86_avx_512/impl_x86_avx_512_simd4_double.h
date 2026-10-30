@@ -160,7 +160,11 @@ static inline Simd4Double gmx_simdcall fnms(Simd4Double a, Simd4Double b, Simd4D
 
 static inline Simd4Double gmx_simdcall rsqrt(Simd4Double x)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_rsqrt14_pd(x.simdInternal_) };
+#else
     return { _mm512_castpd512_pd256(_mm512_rsqrt14_pd(_mm512_castpd256_pd512(x.simdInternal_))) };
+#endif
 }
 
 static inline Simd4Double gmx_simdcall abs(Simd4Double x)
@@ -213,36 +217,39 @@ static inline void gmx_simdcall transpose(Simd4Double* v0, Simd4Double* v1, Simd
     v3->simdInternal_ = _mm256_permute2f128_pd(t2, t4, 0x31);
 }
 
+/* With AVX512VL the 256-bit compare/select/rsqrt14 forms are used directly. Without
+ * it (AVX512F only) the operands are widened to zmm with undefined upper lanes, which
+ * are masked off.
+ */
+template<int op>
+static inline __mmask8 gmx_simdcall simd4DoubleCompare(__m256d a, __m256d b)
+{
+#if defined(__AVX512VL__)
+    return _mm256_cmp_pd_mask(a, b, op);
+#else
+    return _mm512_mask_cmp_pd_mask(
+            avx512Int2Mask(0xF), _mm512_castpd256_pd512(a), _mm512_castpd256_pd512(b), op);
+#endif
+}
+
 static inline Simd4DBool gmx_simdcall operator==(Simd4Double a, Simd4Double b)
 {
-    return { _mm512_mask_cmp_pd_mask(avx512Int2Mask(0xF),
-                                     _mm512_castpd256_pd512(a.simdInternal_),
-                                     _mm512_castpd256_pd512(b.simdInternal_),
-                                     _CMP_EQ_OQ) };
+    return { simd4DoubleCompare<_CMP_EQ_OQ>(a.simdInternal_, b.simdInternal_) };
 }
 
 static inline Simd4DBool gmx_simdcall operator!=(Simd4Double a, Simd4Double b)
 {
-    return { _mm512_mask_cmp_pd_mask(avx512Int2Mask(0xF),
-                                     _mm512_castpd256_pd512(a.simdInternal_),
-                                     _mm512_castpd256_pd512(b.simdInternal_),
-                                     _CMP_NEQ_OQ) };
+    return { simd4DoubleCompare<_CMP_NEQ_OQ>(a.simdInternal_, b.simdInternal_) };
 }
 
 static inline Simd4DBool gmx_simdcall operator<(Simd4Double a, Simd4Double b)
 {
-    return { _mm512_mask_cmp_pd_mask(avx512Int2Mask(0xF),
-                                     _mm512_castpd256_pd512(a.simdInternal_),
-                                     _mm512_castpd256_pd512(b.simdInternal_),
-                                     _CMP_LT_OQ) };
+    return { simd4DoubleCompare<_CMP_LT_OQ>(a.simdInternal_, b.simdInternal_) };
 }
 
 static inline Simd4DBool gmx_simdcall operator<=(Simd4Double a, Simd4Double b)
 {
-    return { _mm512_mask_cmp_pd_mask(avx512Int2Mask(0xF),
-                                     _mm512_castpd256_pd512(a.simdInternal_),
-                                     _mm512_castpd256_pd512(b.simdInternal_),
-                                     _CMP_LE_OQ) };
+    return { simd4DoubleCompare<_CMP_LE_OQ>(a.simdInternal_, b.simdInternal_) };
 }
 
 static inline Simd4DBool gmx_simdcall operator&&(Simd4DBool a, Simd4DBool b)
@@ -262,21 +269,33 @@ static inline bool gmx_simdcall anyTrue(Simd4DBool x)
 
 static inline Simd4Double gmx_simdcall selectByMask(Simd4Double a, Simd4DBool m)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_maskz_mov_pd(m.simdInternal_, a.simdInternal_) };
+#else
     return { _mm512_castpd512_pd256(_mm512_mask_mov_pd(
             _mm512_setzero_pd(), m.simdInternal_, _mm512_castpd256_pd512(a.simdInternal_))) };
+#endif
 }
 
 static inline Simd4Double gmx_simdcall selectByNotMask(Simd4Double a, Simd4DBool m)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_mask_mov_pd(a.simdInternal_, m.simdInternal_, _mm256_setzero_pd()) };
+#else
     return { _mm512_castpd512_pd256(_mm512_mask_mov_pd(
             _mm512_castpd256_pd512(a.simdInternal_), m.simdInternal_, _mm512_setzero_pd())) };
+#endif
 }
 
 static inline Simd4Double gmx_simdcall blend(Simd4Double a, Simd4Double b, Simd4DBool sel)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_mask_blend_pd(sel.simdInternal_, a.simdInternal_, b.simdInternal_) };
+#else
     return { _mm512_castpd512_pd256(_mm512_mask_blend_pd(sel.simdInternal_,
                                                          _mm512_castpd256_pd512(a.simdInternal_),
                                                          _mm512_castpd256_pd512(b.simdInternal_))) };
+#endif
 }
 
 static inline double gmx_simdcall reduce(Simd4Double a)

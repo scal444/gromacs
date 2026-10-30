@@ -297,6 +297,11 @@ static inline SimdDouble frexp(SimdDouble value, SimdDInt32* exponent)
                 _mm512_cmp_pd_mask(_mm512_setzero_pd(), value.simdInternal_, _CMP_NEQ_OQ);
         rExponent = _mm512_maskz_getexp_pd(valueIsNonZero, value.simdInternal_);
 
+#if defined(__AVX512VL__)
+        // Same as the float version: zero exponent for zero input (maskz_getexp), +1 elsewhere.
+        iExponent = _mm512_cvtpd_epi32(rExponent);
+        iExponent = _mm256_mask_add_epi32(iExponent, valueIsNonZero, iExponent, _mm256_set1_epi32(1));
+#else
         // AVX512F does not contain any function to use masking when adding 1 to a 256-bit register
         // (that comes with AVX512VL), so to work around this we create an integer -1 value, and
         // use masking in the _conversion_ instruction where it is supported. When we later add
@@ -304,6 +309,7 @@ static inline SimdDouble frexp(SimdDouble value, SimdDInt32* exponent)
         // will be assigned -1 + 1 = 0.
         iExponent = _mm512_mask_cvtpd_epi32(_mm256_set1_epi32(-1), valueIsNonZero, rExponent);
         iExponent = _mm256_add_epi32(iExponent, _mm256_set1_epi32(1));
+#endif
 
         // Set result to value (+-0) when it is zero.
         result = _mm512_mask_getmant_pd(
@@ -455,25 +461,37 @@ static inline SimdDInt32 gmx_simdcall operator*(SimdDInt32 a, SimdDInt32 b)
 
 static inline SimdDIBool gmx_simdcall operator==(SimdDInt32 a, SimdDInt32 b)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_cmpeq_epi32_mask(a.simdInternal_, b.simdInternal_) };
+#else
     return { _mm512_mask_cmp_epi32_mask(avx512Int2Mask(0xFF),
                                         _mm512_castsi256_si512(a.simdInternal_),
                                         _mm512_castsi256_si512(b.simdInternal_),
                                         _MM_CMPINT_EQ) };
+#endif
 }
 
 static inline SimdDIBool gmx_simdcall testBits(SimdDInt32 a)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_test_epi32_mask(a.simdInternal_, a.simdInternal_) };
+#else
     return { _mm512_mask_test_epi32_mask(avx512Int2Mask(0xFF),
                                          _mm512_castsi256_si512(a.simdInternal_),
                                          _mm512_castsi256_si512(a.simdInternal_)) };
+#endif
 }
 
 static inline SimdDIBool gmx_simdcall operator<(SimdDInt32 a, SimdDInt32 b)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_cmplt_epi32_mask(a.simdInternal_, b.simdInternal_) };
+#else
     return { _mm512_mask_cmp_epi32_mask(avx512Int2Mask(0xFF),
                                         _mm512_castsi256_si512(a.simdInternal_),
                                         _mm512_castsi256_si512(b.simdInternal_),
                                         _MM_CMPINT_LT) };
+#endif
 }
 
 static inline SimdDIBool gmx_simdcall operator&&(SimdDIBool a, SimdDIBool b)
@@ -493,21 +511,35 @@ static inline bool gmx_simdcall anyTrue(SimdDIBool a)
 
 static inline SimdDInt32 gmx_simdcall selectByMask(SimdDInt32 a, SimdDIBool m)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_maskz_mov_epi32(static_cast<__mmask8>(m.simdInternal_), a.simdInternal_) };
+#else
     return { _mm512_castsi512_si256(_mm512_mask_mov_epi32(
             _mm512_setzero_si512(), m.simdInternal_, _mm512_castsi256_si512(a.simdInternal_))) };
+#endif
 }
 
 static inline SimdDInt32 gmx_simdcall selectByNotMask(SimdDInt32 a, SimdDIBool m)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_mask_mov_epi32(
+            a.simdInternal_, static_cast<__mmask8>(m.simdInternal_), _mm256_setzero_si256()) };
+#else
     return { _mm512_castsi512_si256(_mm512_mask_mov_epi32(
             _mm512_castsi256_si512(a.simdInternal_), m.simdInternal_, _mm512_setzero_si512())) };
+#endif
 }
 
 static inline SimdDInt32 gmx_simdcall blend(SimdDInt32 a, SimdDInt32 b, SimdDIBool sel)
 {
+#if defined(__AVX512VL__)
+    return { _mm256_mask_blend_epi32(
+            static_cast<__mmask8>(sel.simdInternal_), a.simdInternal_, b.simdInternal_) };
+#else
     return { _mm512_castsi512_si256(_mm512_mask_blend_epi32(sel.simdInternal_,
                                                             _mm512_castsi256_si512(a.simdInternal_),
                                                             _mm512_castsi256_si512(b.simdInternal_))) };
+#endif
 }
 
 static inline SimdDInt32 gmx_simdcall cvtR2I(SimdDouble a)
