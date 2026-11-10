@@ -441,7 +441,10 @@ void PmePpComm::sendFinish() const
     if (thisRankReceivesVirialAndEnergy_)
     {
         // Blocking MPI call is used, can use a stack variable
-        gmx_pme_comm_n_box_t cnb;
+        // Value-initialize, as that also zeroes the padding bytes,
+        // which are sent along over MPI.
+        gmx_pme_comm_n_box_t cnb = gmx_pme_comm_n_box_t();
+
         cnb.flags = PP_PME_FINISH;
 
 #if GMX_MPI
@@ -457,7 +460,9 @@ void PmePpComm::sendSwitchGrid(ivec grid_size, const real ewaldcoeff_q, const re
     if (thisRankReceivesVirialAndEnergy_)
     {
         // Blocking MPI call is used, can use a stack variable
-        gmx_pme_comm_n_box_t cnb;
+        // Value-initialize to also zero the padding bytes, see sendFinish()
+        gmx_pme_comm_n_box_t cnb = gmx_pme_comm_n_box_t();
+
         cnb.flags = PP_PME_SWITCHGRID;
         copy_ivec(grid_size, cnb.grid_size);
         cnb.ewaldcoeff_q  = ewaldcoeff_q;
@@ -476,7 +481,8 @@ void PmePpComm::sendResetCounters(const int64_t step) const
     if (thisRankReceivesVirialAndEnergy_)
     {
         // Blocking MPI call is used, can use a stack variable
-        gmx_pme_comm_n_box_t cnb;
+        // Value-initialize to also zero the padding bytes, see sendFinish()
+        gmx_pme_comm_n_box_t cnb = gmx_pme_comm_n_box_t();
 
         cnb.flags = PP_PME_RESETCOUNTERS;
         cnb.step  = step;
@@ -496,7 +502,9 @@ void PmePpComm::sendCycleCountersAndStopConditionRequest()
         GMX_ASSERT(cycleCountersRequest_ == MPI_REQUEST_NULL,
                    "PME cycle counter request is already pending");
 
-        gmx_pme_comm_n_box_t cnb;
+        // Value-initialize to also zero the padding bytes, see sendFinish()
+        gmx_pme_comm_n_box_t cnb = gmx_pme_comm_n_box_t();
+
         cnb.flags = PP_PME_SENDCOUNTERS;
 
 #if GMX_MPI
