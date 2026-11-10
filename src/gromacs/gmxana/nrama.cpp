@@ -133,6 +133,10 @@ static void add_xr(t_xrama* xr, const int ff[5], const t_atoms* atoms)
     int  i;
 
     srenew(xr->dih, xr->ndih + 2LL);
+    // srenew does not initialize the new entries. In particular, mult == 0
+    // is used later to detect dihedrals that are not in the topology.
+    xr->dih[xr->ndih]     = t_dih{};
+    xr->dih[xr->ndih + 1] = t_dih{};
     for (i = 0; (i < 4); i++)
     {
         xr->dih[xr->ndih].ai[i] = ff[i];
