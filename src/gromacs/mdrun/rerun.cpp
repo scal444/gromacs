@@ -201,7 +201,7 @@ void LegacySimulator::do_rerun()
     tensor            force_vir, shake_vir, total_vir, pres;
     t_trxstatus*      status = nullptr;
     rvec              mu_tot;
-    t_trxframe        rerun_fr;
+    t_trxframe        rerun_fr = t_trxframe(); // Also zeroes padding, which is sent over MPI
     ForceBuffers      f;
     gmx_global_stat_t gstat;
     shellfc_t*        shellfc;
