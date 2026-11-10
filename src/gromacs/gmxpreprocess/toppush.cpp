@@ -1465,6 +1465,7 @@ void push_cmaptype(Directive                                                  d,
     }
 
 
+    bool haveAllBondAtomTypes = true;
     for (int i = 0; (i < nral); i++)
     {
         std::optional<int> cmapBondAtomType = bondAtomType.bondAtomTypeFromName(atomTypeNames[i]);
@@ -1479,10 +1480,17 @@ void push_cmaptype(Directive                                                  d,
                                  atomTypeNames[3].c_str(),
                                  atomTypeNames[4].c_str());
             wi->addError(message);
+            haveAllBondAtomTypes = false;
             continue;
         }
         cmapType.atomTypes_[i]        = cmapBondAtomType.value();
         cmapType.residueTypeNames_[i] = std::move(residueTypeNames[i]);
+    }
+    if (!haveAllBondAtomTypes)
+    {
+        // The error(s) noted above will terminate grompp. Do not store
+        // the type, as not all its atom types have been set.
+        return;
     }
 
     std::array<real, MAXFORCEPARAM> forceParam = { NOTSET };
