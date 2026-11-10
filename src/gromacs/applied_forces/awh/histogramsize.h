@@ -66,6 +66,7 @@ class ArrayRef;
 struct AwhBiasStateHistory;
 class AwhBiasParams;
 class BiasParams;
+class MpiComm;
 class PointState;
 
 /*! \internal
@@ -135,6 +136,12 @@ public:
      * \param[in] stateHistory  The AWH bias state history.
      */
     void restoreFromHistory(const AwhBiasStateHistory& stateHistory);
+
+    /*! \brief Broadcast the histogram size state over the MPI ranks in this simulation.
+     *
+     * \param[in] mpiComm  MPI communicator for my group.
+     */
+    void broadcast(const MpiComm& mpiComm);
 
     /*! \brief Store the histogram size state in a history struct.
      *

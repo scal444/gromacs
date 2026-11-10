@@ -78,6 +78,13 @@ CoordState::CoordState(const AwhBiasParams&      awhBiasParams,
     {
         coordValue_[d] = dimParams[d].scaleUserInputToInternal(awhDimParams[d].initialCoordinate());
     }
+    /* The elements beyond the dimensionality of the bias are not used,
+     * but they are broadcast over MPI along with the rest of the state.
+     */
+    for (int d = gmx::ssize(awhDimParams); d < c_biasMaxNumDim; d++)
+    {
+        coordValue_[d] = 0;
+    }
 
     /* The grid-point index is always the nearest point to the coordinate.
      * We initialize the umbrella location to the same nearest point.

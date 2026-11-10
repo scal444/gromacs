@@ -53,10 +53,12 @@
 #include <algorithm>
 #include <string>
 
+#include "gromacs/gmxlib/network.h"
 #include "gromacs/mdtypes/awh_history.h"
 #include "gromacs/mdtypes/awh_params.h"
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/mpicomm.h"
 #include "gromacs/utility/stringutil.h"
 
 #include "biasparams.h"
@@ -273,6 +275,22 @@ void HistogramSize::restoreFromHistory(const AwhBiasStateHistory& stateHistory)
     logScaledSampleWeight_    = stateHistory.logScaledSampleWeight;
     maxLogScaledSampleWeight_ = stateHistory.maxLogScaledSampleWeight;
     havePrintedAboutCovering_ = false;
+}
+
+void HistogramSize::broadcast(const MpiComm& mpiComm)
+{
+    /* Broadcast the members one by one, instead of the bytes of the whole
+     * object, as the object contains padding bytes that are not initialized.
+     */
+    gmx_bcast(sizeof(numUpdates_), &numUpdates_, mpiComm.comm());
+    gmx_bcast(sizeof(histogramSize_), &histogramSize_, mpiComm.comm());
+    gmx_bcast(sizeof(inInitialStage_), &inInitialStage_, mpiComm.comm());
+    gmx_bcast(sizeof(growthFactor_), &growthFactor_, mpiComm.comm());
+    gmx_bcast(sizeof(equilibrateHistogram_), &equilibrateHistogram_, mpiComm.comm());
+    gmx_bcast(sizeof(histogramTolerance_), &histogramTolerance_, mpiComm.comm());
+    gmx_bcast(sizeof(logScaledSampleWeight_), &logScaledSampleWeight_, mpiComm.comm());
+    gmx_bcast(sizeof(maxLogScaledSampleWeight_), &maxLogScaledSampleWeight_, mpiComm.comm());
+    gmx_bcast(sizeof(havePrintedAboutCovering_), &havePrintedAboutCovering_, mpiComm.comm());
 }
 
 void HistogramSize::storeState(AwhBiasStateHistory* stateHistory) const

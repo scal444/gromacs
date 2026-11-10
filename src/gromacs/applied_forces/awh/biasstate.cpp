@@ -1623,7 +1623,7 @@ void BiasState::broadcast(const MpiComm& mpiComm)
 
     gmx_bcast(weightSumCovering_.size() * sizeof(double), weightSumCovering_.data(), mpiComm.comm());
 
-    gmx_bcast(sizeof(histogramSize_), &histogramSize_, mpiComm.comm());
+    histogramSize_.broadcast(mpiComm);
 }
 
 void BiasState::setFreeEnergyToConvolvedPmf(ArrayRef<const DimParams> dimParams, const BiasGrid& grid)
