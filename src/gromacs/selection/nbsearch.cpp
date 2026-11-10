@@ -900,12 +900,15 @@ void AnalysisNeighborhoodSearchImpl::init(AnalysisNeighborhood::SearchMode     m
         clear_rvec(box[ZZ]);
         set_pbc(&pbc_, PbcType::XY, box);
     }
-    else if (pbc != nullptr)
+    else if (pbc != nullptr && pbc->pbcType != PbcType::No)
     {
         pbc_ = *pbc;
     }
     else
     {
+        // Note that set_pbc() with PbcType::No does not initialize the box
+        // (nor most other fields) in t_pbc, so a non-null pbc without PBC
+        // must not be copied: the box is used when setting up the grid.
         pbc_.pbcType = PbcType::No;
         clear_mat(pbc_.box);
     }

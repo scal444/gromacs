@@ -969,6 +969,36 @@ TEST_F(NeighborhoodSearchTest, GridSearchNoPBC)
     testPairSearch(&search, data);
 }
 
+TEST_F(NeighborhoodSearchTest, GridSearchNoPBCWithUnsetBox)
+{
+    const NeighborhoodSearchTestData& data = RandomBoxNoPBCData::get();
+
+    // set_pbc() with PbcType::No only sets the PBC type and leaves the box
+    // in t_pbc untouched, so the search must not use it. This is what
+    // trajectory analysis tools pass in for systems without PBC.
+    // The box is left uninitialized on purpose such that sanitizers and
+    // valgrind can detect any use; in other builds we fill it with a
+    // triclinic box that does not match the positions.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    t_pbc pbc;
+#if !defined(__has_feature) || !__has_feature(memory_sanitizer)
+    for (int d = 0; d < DIM; d++)
+    {
+        pbc.box[d][XX] = 1.5;
+        pbc.box[d][YY] = 2.5;
+        pbc.box[d][ZZ] = 0.5;
+    }
+#endif
+    set_pbc(&pbc, PbcType::No, data.box_);
+
+    nb_.setCutoff(data.cutoff_);
+    nb_.setMode(gmx::AnalysisNeighborhood::eSearchMode_Grid);
+    gmx::AnalysisNeighborhoodSearch search = nb_.initSearch(&pbc, data.refPositions());
+    ASSERT_EQ(gmx::AnalysisNeighborhood::eSearchMode_Grid, search.mode());
+
+    testPairSearch(&search, data);
+}
+
 TEST_F(NeighborhoodSearchTest, GridSearchXYBox)
 {
     const NeighborhoodSearchTestData& data = RandomBoxXYFullPBCData::get();
