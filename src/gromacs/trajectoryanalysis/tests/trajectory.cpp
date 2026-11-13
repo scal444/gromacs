@@ -97,7 +97,7 @@ TEST_F(TrajectoryModuleTest, PlotsXOnly)
 
 TEST_F(TrajectoryModuleTest, WritesCoordinatesVelocitiesAndForces)
 {
-    const char* const cmdline[] = { "trajectory", "-select", "resnr 1", "resnr 2" };
+    const char* const cmdline[] = { "trajectory", "-select", "resnr 1", "resnr 2", "-e", "0.003" };
     setTopology("clustsize.tpr");
     setTrajectory("extract_cluster.trr");
     setOutputFile("-ox", "coord.xvg", NoTextMatch());
