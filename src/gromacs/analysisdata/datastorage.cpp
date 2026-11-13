@@ -60,6 +60,7 @@
 #include "gromacs/utility/classhelpers.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/stringutil.h"
 
 namespace gmx
 {
@@ -275,6 +276,8 @@ public:
     int nextIndex_;
     //! Value returned by needStorage().
     bool bNeedStorage_;
+    //! Whether any frame has been started.
+    bool bAnyFrameStarted_;
     /*! \brief
      * Guards the frame bookkeeping against concurrent access.
      *
@@ -418,7 +421,8 @@ AnalysisDataStorageImpl::AnalysisDataStorageImpl() :
     firstFrameLocation_(0),
     firstUnnotifiedIndex_(0),
     nextIndex_(0),
-    bNeedStorage_(false)
+    bNeedStorage_(false),
+    bAnyFrameStarted_(false)
 {
 }
 
@@ -527,13 +531,19 @@ void AnalysisDataStorageImpl::finishFrameSerial(int index)
 {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     const int                             storageIndex = computeStorageLocation(index);
-    // A frame that was never started was not produced by the data source
-    // (e.g., a data set that is not written for input without velocities).
-    // Skip it, matching serial processing where no notifications are
-    // generated for frames that are not started.
     if (pendingLimit_ > 1 && (storageIndex < 0 || !frames_[storageIndex]->isStarted()))
     {
-        return;
+        // A data set to which no frames are added (e.g., one that is only
+        // written for input with velocities) is skipped, matching serial
+        // processing where nothing is notified for such data.
+        if (!bAnyFrameStarted_)
+        {
+            return;
+        }
+        // Missing frames among other frames are not supported, as in
+        // serial processing.
+        GMX_THROW(APIError(formatString(
+                "No data was added for frame %d, but data was added for other frames", index)));
     }
     GMX_RELEASE_ASSERT(index == firstUnnotifiedIndex_, "Out of order finisFrameSerial() calls");
     GMX_RELEASE_ASSERT(storageIndex >= 0, "Out of bounds frame index");
@@ -873,6 +883,7 @@ AnalysisDataStorageFrame& AnalysisDataStorage::startFrame(const AnalysisDataFram
     GMX_RELEASE_ASSERT(storedFrame->frameIndex() == header.index(),
                        "Inconsistent internal frame indexing");
     storedFrame->startFrame(header, impl_->getFrameBuilder());
+    impl_->bAnyFrameStarted_ = true;
     impl_->modules_->notifyParallelFrameStart(header);
     if (impl_->shouldNotifyImmediately())
     {
