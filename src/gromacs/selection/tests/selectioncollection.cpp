@@ -46,12 +46,14 @@
 #include <cstdint>
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "gromacs/options/basicoptions.h"
@@ -710,6 +712,67 @@ TEST_F(SelectionCollectionTest, MapSelectionMapsSelectionsToCopy)
         EXPECT_STREQ(sel.name(), copied.name());
         EXPECT_EQ(sel.atomCount(), copied.atomCount());
     }
+}
+
+TEST_F(SelectionCollectionTest, CopyResolvesIndexGroupsAfterGroupsAreCleared)
+{
+    ASSERT_NO_THROW_GMX(loadIndexGroups("simple.ndx"));
+    ASSERT_NO_THROW_GMX(
+            sel_ = sc_.parseFromString("group \"GrpA\"; GrpB; group \"GrpB\" and resname RB"));
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    // SelectionOptionBehavior clears the groups before the selections are
+    // compiled and copied.
+    ASSERT_NO_THROW_GMX(sc_.setIndexGroups(nullptr));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    std::unique_ptr<gmx::SelectionCollection> sc2;
+    ASSERT_NO_THROW_GMX(sc2 = std::make_unique<gmx::SelectionCollection>(sc_));
+    ASSERT_NO_THROW_GMX(sc_.evaluate(topManager_.frame(), nullptr));
+    ASSERT_NO_THROW_GMX(sc2->evaluate(topManager_.frame(), nullptr));
+    ASSERT_EQ(3U, sel_.size());
+    for (const gmx::Selection& sel : sel_)
+    {
+        SCOPED_TRACE(sel.name());
+        const std::optional<gmx::Selection> copied = sc2->selection(sel.name());
+        ASSERT_TRUE(copied.has_value());
+        EXPECT_STREQ(sel.selectionText(), copied->selectionText());
+        EXPECT_THAT(copied->atomIndices(), ::testing::ElementsAreArray(sel.atomIndices()));
+    }
+}
+
+TEST_F(SelectionCollectionTest, CopyPreservesOriginalIds)
+{
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString("resname R"));
+    ASSERT_NO_FATAL_FAILURE(loadTopology("sphere.gro"));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    ASSERT_EQ(1U, sel_.size());
+    ASSERT_GT(sel_[0].posCount(), 1);
+    sel_[0].setOriginalId(0, 42);
+    sel_[0].setOriginalId(1, -1);
+
+    gmx::SelectionCollection            sc2(sc_);
+    const std::optional<gmx::Selection> copied = sc2.selection(sel_[0].name());
+    ASSERT_TRUE(copied.has_value());
+    ASSERT_NO_THROW_GMX(sc_.evaluate(topManager_.frame(), nullptr));
+    ASSERT_NO_THROW_GMX(sc2.evaluate(topManager_.frame(), nullptr));
+    EXPECT_EQ(42, copied->position(0).mappedId());
+    EXPECT_EQ(-1, copied->position(1).mappedId());
+    EXPECT_THAT(copied->mappedIds(), ::testing::ElementsAreArray(sel_[0].mappedIds()));
+}
+
+TEST_F(SelectionCollectionTest, CopyPreservesCoveredFractionType)
+{
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString(
+                                "insolidangle center cog of resname C span resname R cutoff 20"));
+    ASSERT_NO_FATAL_FAILURE(loadTopology("sphere.gro"));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    ASSERT_EQ(1U, sel_.size());
+    ASSERT_TRUE(sel_[0].initCoveredFraction(CFRAC_SOLIDANGLE));
+    ASSERT_TRUE(sel_[0].isCoveredFractionDynamic());
+
+    gmx::SelectionCollection            sc2(sc_);
+    const std::optional<gmx::Selection> copied = sc2.selection(sel_[0].name());
+    ASSERT_TRUE(copied.has_value());
+    EXPECT_TRUE(copied->isCoveredFractionDynamic());
 }
 
 
