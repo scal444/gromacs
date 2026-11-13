@@ -404,22 +404,17 @@ public:
      */
     [[nodiscard]] std::optional<Selection> selection(std::string_view selName) const;
     /*! \brief
-     * Returns the selection in this collection that corresponds to a given
-     * selection.
+     * Returns this collection's copy of a selection from the source collection.
      *
-     * \param[in] selection  Selection that belongs to this collection, or
-     *     to the collection from which this collection was copied.
-     * \returns   \p selection if it belongs to this collection, otherwise
-     *     the selection at the same position in this collection.
+     * Copying a collection also copies its selections, but existing Selection
+     * handles still refer to the originals.  Use this to get the handle to the
+     * copy, whose values reflect evaluation of this collection.
      *
-     * Selection objects created from a collection are not updated when a
-     * copy of that collection is evaluated; this method maps them to the
-     * selections owned by the copy.  The collection that was copied must
-     * still exist when this method is called with one of its selections.
-     *
-     * Does not throw.
+     * \p selection must belong to the collection this one was copied from,
+     * and that collection must still exist.  If this collection is not a copy,
+     * \p selection is returned as is.
      */
-    [[nodiscard]] Selection correspondingSelection(const Selection& selection) const;
+    [[nodiscard]] Selection mapSelection(const Selection& selection) const;
     /*! \brief
      * Adds covered fractions accumulated in a copy of this collection.
      *

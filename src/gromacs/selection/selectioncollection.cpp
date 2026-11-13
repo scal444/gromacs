@@ -961,25 +961,24 @@ void SelectionCollection::evaluate(t_trxframe* fr, t_pbc* pbc)
 }
 
 
-Selection SelectionCollection::correspondingSelection(const Selection& selection) const
+Selection SelectionCollection::mapSelection(const Selection& selection) const
 {
-    const auto& selections = impl_->sc_.sel;
-    for (const auto& ownSelection : selections)
+    if (impl_->source_ == nullptr)
     {
-        if (Selection(ownSelection.get()) == selection)
-        {
-            return selection;
-        }
+        return selection;
     }
-    GMX_RELEASE_ASSERT(impl_->source_ != nullptr, "Selection does not belong to this collection");
+    const auto& ownSelections    = impl_->sc_.sel;
     const auto& sourceSelections = impl_->source_->impl_->sc_.sel;
-    GMX_RELEASE_ASSERT(sourceSelections.size() == selections.size(),
+    GMX_RELEASE_ASSERT(sourceSelections.size() == ownSelections.size(),
                        "Collection is not a copy of the source collection");
+    // Look the selection up by identity rather than by name, because
+    // selection names need not be unique.  Copying preserves the order of
+    // the selections, so the copy is at the same index.
     for (size_t i = 0; i < sourceSelections.size(); ++i)
     {
         if (Selection(sourceSelections[i].get()) == selection)
         {
-            return Selection(selections[i].get());
+            return Selection(ownSelections[i].get());
         }
     }
     GMX_RELEASE_ASSERT(false, "Selection does not belong to the source collection");

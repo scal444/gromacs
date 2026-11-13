@@ -694,6 +694,24 @@ TEST_F(SelectionCollectionTest, CopiedSelectionListsAreHandledSeparately)
     EXPECT_FALSE(sel_[1].hasForces());
 }
 
+TEST_F(SelectionCollectionTest, MapSelectionMapsSelectionsToCopy)
+{
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString("atomnr 1 to 5; atomnr 6 to 10"));
+    ASSERT_NO_FATAL_FAILURE(setAtomCount(10));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    gmx::SelectionCollection sc2(sc_);
+    ASSERT_EQ(2U, sel_.size());
+    for (const gmx::Selection& sel : sel_)
+    {
+        EXPECT_TRUE(sc_.mapSelection(sel) == sel);
+        const gmx::Selection copied = sc2.mapSelection(sel);
+        ASSERT_TRUE(copied.isValid());
+        EXPECT_FALSE(copied == sel);
+        EXPECT_STREQ(sel.name(), copied.name());
+        EXPECT_EQ(sel.atomCount(), copied.atomCount());
+    }
+}
+
 
 /********************************************************************
  * Tests for interactive selection input

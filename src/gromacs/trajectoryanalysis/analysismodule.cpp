@@ -197,7 +197,7 @@ Selection TrajectoryAnalysisModuleData::parallelSelection(const Selection& selec
     {
         return selection;
     }
-    return impl_->selections_.correspondingSelection(selection);
+    return impl_->selections_.mapSelection(selection);
 }
 
 
