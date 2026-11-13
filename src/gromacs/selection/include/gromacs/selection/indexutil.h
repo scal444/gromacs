@@ -234,6 +234,8 @@ struct gmx_ana_indexmap_t
 void gmx_ana_indexgrps_init(gmx_ana_indexgrps_t** g, gmx_mtop_t* top, const char* fnm);
 /** Frees memory allocated for index groups. */
 void gmx_ana_indexgrps_free(gmx_ana_indexgrps_t* g);
+/** Creates a copy of index groups. */
+gmx_ana_indexgrps_t* gmx_ana_indexgrps_copy(gmx_ana_indexgrps_t* src);
 
 /** Extracts a single index group. */
 bool gmx_ana_indexgrps_extract(gmx_ana_index_t* dest, std::string* destName, gmx_ana_indexgrps_t* src, int n);

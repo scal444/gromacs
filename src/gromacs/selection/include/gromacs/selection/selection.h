@@ -164,6 +164,17 @@ public:
 
     //! \copydoc Selection::initCoveredFraction()
     bool initCoveredFraction(e_coverfrac_t type);
+    /*! \brief
+     * Copies state that is set on a compiled selection by its user.
+     *
+     * \param[in] source  Selection from which this one was copied.
+     *
+     * Copies original ids (see Selection::setOriginalId() and
+     * Selection::initOriginalIdsToGroup()) and the covered fraction type,
+     * which are not reproduced by reparsing and compiling the selection
+     * text.  Both selections must be compiled and have the same positions.
+     */
+    void copyPostCompilationState(const SelectionData& source);
 
     /*! \brief
      * Updates the name of the selection if missing.

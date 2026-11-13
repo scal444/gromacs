@@ -192,6 +192,13 @@ public:
     bool bExternalGroupsSet_;
     //! External index groups (can be NULL).
     gmx_ana_indexgrps_t* grps_;
+    /*! \brief
+     * Copy of the external index groups (can be NULL).
+     *
+     * Kept after \a grps_ is cleared, and shared with copies of this
+     * collection to resolve the same index group references.
+     */
+    std::shared_ptr<gmx_ana_indexgrps_t> savedGrps_;
 };
 
 /*! \internal

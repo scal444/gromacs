@@ -196,6 +196,21 @@ void gmx_ana_indexgrps_free(gmx_ana_indexgrps_t* g)
     delete g;
 }
 
+/*!
+ * \param[in] src  Index groups to copy.
+ * \returns   Copy of \p src, to be freed with gmx_ana_indexgrps_free().
+ */
+gmx_ana_indexgrps_t* gmx_ana_indexgrps_copy(gmx_ana_indexgrps_t* src)
+{
+    auto* dest = new gmx_ana_indexgrps_t(gmx::ssize(src->g));
+    for (int i = 0; i < gmx::ssize(src->g); ++i)
+    {
+        gmx_ana_index_copy(&dest->g[i], &src->g[i], true);
+    }
+    dest->names = src->names;
+    return dest;
+}
+
 
 /*!
  * \param[out] dest     Output structure.

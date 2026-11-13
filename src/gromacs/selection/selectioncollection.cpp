@@ -565,15 +565,22 @@ SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
         gmx_ana_index_copy(&impl_->sc_.gall, &rhs.impl_->sc_.gall, /*balloc=*/false);
     }
 
-    if (rhs.impl_->grps_ != nullptr)
+    if (rhs.impl_->savedGrps_ != nullptr)
     {
-        setIndexGroups(rhs.impl_->grps_);
+        impl_->savedGrps_ = rhs.impl_->savedGrps_;
+        setIndexGroups(impl_->savedGrps_.get());
     }
 
     // Only compile the selection if rhs is compiled.
     if (rhs.impl_->sc_.mempool != nullptr)
     {
         compile();
+        // Original ids and covered fraction types are set after
+        // compilation and are not reproduced by compiling the text.
+        for (size_t i = 0; i < rhs.impl_->sc_.sel.size(); i++)
+        {
+            impl_->sc_.sel[i]->copyPostCompilationState(*rhs.impl_->sc_.sel[i]);
+        }
     }
 }
 
@@ -688,6 +695,13 @@ void SelectionCollection::setIndexGroups(gmx_ana_indexgrps_t* grps)
                        "Can only set external groups once or clear them afterwards");
     impl_->grps_               = grps;
     impl_->bExternalGroupsSet_ = true;
+    // The caller usually frees the groups once the selections are parsed,
+    // so keep a copy for resolving the same references in copies of this
+    // collection, which reparse the selection text.
+    if (grps != nullptr && grps != impl_->savedGrps_.get())
+    {
+        impl_->savedGrps_.reset(gmx_ana_indexgrps_copy(grps), gmx_ana_indexgrps_free);
+    }
 
     ExceptionInitializer        errors("Invalid index group reference(s)");
     SelectionTreeElementPointer root = impl_->sc_.root;
