@@ -160,13 +160,16 @@ bool SelectionData::initCoveredFraction(e_coverfrac_t type)
 
 void SelectionData::copyPostCompilationState(const SelectionData& source)
 {
-    GMX_RELEASE_ASSERT(posCount() == source.posCount(),
-                       "Copied selection has different number of positions");
     gmx_ana_indexmap_t&       map       = rawPositions_.m;
     const gmx_ana_indexmap_t& sourceMap = source.rawPositions_.m;
+    // The source may have been evaluated, so compare and copy the ids of
+    // all possible positions, not only those currently selected.
     GMX_RELEASE_ASSERT(map.b.nr == sourceMap.b.nr, "Copied selection has different blocks");
     std::copy(sourceMap.orgid, sourceMap.orgid + sourceMap.b.nr, map.orgid);
-    std::copy(sourceMap.mapid, sourceMap.mapid + posCount(), map.mapid);
+    for (int i = 0; i < posCount(); ++i)
+    {
+        map.mapid[i] = map.orgid[map.refid[i]];
+    }
     initCoveredFraction(source.coveredFractionType_);
 }
 

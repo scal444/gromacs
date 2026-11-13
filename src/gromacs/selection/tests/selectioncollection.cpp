@@ -741,6 +741,59 @@ TEST_F(SelectionCollectionTest, CopyPreservesOriginalIds)
     EXPECT_THAT(copied->mappedIds(), ::testing::ElementsAreArray(sel_[0].mappedIds()));
 }
 
+//! Checks that a copied selection evaluates to the same positions as \p sel.
+void checkCopiedSelectionMatches(const gmx::Selection& sel, const gmx::SelectionCollection& copy)
+{
+    SCOPED_TRACE(sel.name());
+    const std::optional<gmx::Selection> copied = copy.selection(sel.name());
+    ASSERT_TRUE(copied.has_value());
+    EXPECT_EQ(sel.posCount(), copied->posCount());
+    EXPECT_THAT(copied->atomIndices(), ::testing::ElementsAreArray(sel.atomIndices()));
+    EXPECT_THAT(copied->refIds(), ::testing::ElementsAreArray(sel.refIds()));
+}
+
+TEST_F(SelectionCollectionTest, CopyUsesCompiledPositionTypes)
+{
+    sc_.setReferencePosType("res_cog");
+    sc_.setOutputPosType("res_cog");
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString("y < 2.5"));
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    gmx::SelectionCollection sc2(sc_);
+    ASSERT_NO_THROW_GMX(sc_.evaluate(topManager_.frame(), nullptr));
+    ASSERT_NO_THROW_GMX(sc2.evaluate(topManager_.frame(), nullptr));
+    // Residues 1, 2 and 5 have their center of geometry at y < 2.5.
+    EXPECT_EQ(3, sel_[0].posCount());
+    checkCopiedSelectionMatches(sel_[0], sc2);
+}
+
+TEST_F(SelectionCollectionTest, CopyDefinesVariables)
+{
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString("low = y < 2.5; low and x < 2.5"));
+    ASSERT_EQ(1U, sel_.size());
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    std::unique_ptr<gmx::SelectionCollection> sc2;
+    ASSERT_NO_THROW_GMX(sc2 = std::make_unique<gmx::SelectionCollection>(sc_));
+    ASSERT_NO_THROW_GMX(sc_.evaluate(topManager_.frame(), nullptr));
+    ASSERT_NO_THROW_GMX(sc2->evaluate(topManager_.frame(), nullptr));
+    EXPECT_EQ(4, sel_[0].posCount());
+    checkCopiedSelectionMatches(sel_[0], *sc2);
+}
+
+TEST_F(SelectionCollectionTest, CanCopyEvaluatedCollection)
+{
+    ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString("y < 2.5"));
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    ASSERT_NO_THROW_GMX(sc_.compile());
+    ASSERT_NO_THROW_GMX(sc_.evaluate(topManager_.frame(), nullptr));
+    ASSERT_EQ(8, sel_[0].posCount());
+    std::unique_ptr<gmx::SelectionCollection> sc2;
+    ASSERT_NO_THROW_GMX(sc2 = std::make_unique<gmx::SelectionCollection>(sc_));
+    ASSERT_NO_THROW_GMX(sc2->evaluate(topManager_.frame(), nullptr));
+    checkCopiedSelectionMatches(sel_[0], *sc2);
+}
+
 TEST_F(SelectionCollectionTest, CopyPreservesCoveredFractionType)
 {
     ASSERT_NO_THROW_GMX(sel_ = sc_.parseFromString(
