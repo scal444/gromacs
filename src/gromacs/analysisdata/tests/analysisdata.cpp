@@ -469,6 +469,33 @@ TEST_F(AnalysisDataSimpleTest, SkipsFramesWithoutDataInParallelProcessing)
 }
 
 /*
+ * Tests that a frame without data among frames with data is an error when
+ * the data is processed in parallel, as it is in serial processing.
+ */
+TEST_F(AnalysisDataSimpleTest, ThrowsForMissingFrameInParallelProcessing)
+{
+    MockAnalysisDataModulePointer mod(
+            new MockAnalysisDataModule(gmx::IAnalysisDataModule::efAllowMulticolumn));
+    using ::testing::_;
+    using ::testing::AnyNumber;
+    EXPECT_CALL(*mod, parallelDataStarted(_, _)).WillOnce(::testing::Return(false));
+    EXPECT_CALL(*mod, dataStarted(_)).Times(AnyNumber());
+    EXPECT_CALL(*mod, frameStarted(_)).Times(AnyNumber());
+    EXPECT_CALL(*mod, pointsAdded(_)).Times(AnyNumber());
+    EXPECT_CALL(*mod, frameFinished(_)).Times(AnyNumber());
+    EXPECT_CALL(*mod, frameFinishedSerial(_)).Times(AnyNumber());
+    EXPECT_CALL(*mod, dataFinished()).Times(AnyNumber());
+    ASSERT_NO_THROW_GMX(data_.addModule(mod));
+
+    gmx::AnalysisDataParallelOptions options(2);
+    gmx::AnalysisDataHandle          handle;
+    ASSERT_NO_THROW_GMX(handle = data_.startData(options));
+    ASSERT_NO_THROW_GMX(AnalysisDataTest::presentDataFrame(input_, 0, handle));
+    ASSERT_NO_THROW_GMX(data_.finishFrameSerial(0));
+    EXPECT_THROW_GMX(data_.finishFrameSerial(1), gmx::APIError);
+}
+
+/*
  * Tests that data can be accessed correctly from a module that requests
  * storage using AbstractAnalysisData::requestStorage() with parameter -1.
  */
