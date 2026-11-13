@@ -172,7 +172,9 @@ public:
      * Copies original ids (see Selection::setOriginalId() and
      * Selection::initOriginalIdsToGroup()) and the covered fraction type,
      * which are not reproduced by reparsing and compiling the selection
-     * text.  Both selections must be compiled and have the same positions.
+     * text.  Both selections must be compiled from the same text, and this
+     * selection must not have been evaluated.  \p source may have been
+     * evaluated.
      */
     void copyPostCompilationState(const SelectionData& source);
     /*! \brief

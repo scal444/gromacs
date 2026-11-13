@@ -214,6 +214,16 @@ public:
     std::string rpost_;
     //! Default output position type for selections.
     std::string spost_;
+    /*! \brief
+     * Reference and output position types that the selections were
+     * compiled with.
+     *
+     * compile() clears \a rpost_ and \a spost_; these keep the values for
+     * reproducing the compiled selections in a copy.
+     */
+    std::string compiledRpost_;
+    //! \copydoc compiledRpost_
+    std::string compiledSpost_;
     //! Atoms needed for evaluating the selections.
     gmx_ana_index_t requiredAtoms_;
     //! Debugging level for the collection.

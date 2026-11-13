@@ -569,12 +569,21 @@ SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
 {
     impl_->source_            = &rhs;
     impl_->sc_.resolvedGroups = rhs.impl_->sc_.resolvedGroups;
-    setReferencePosType(rhs.impl_->rpost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
-                                                  : rhs.impl_->rpost_.c_str());
-    setOutputPosType(rhs.impl_->spost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
-                                               : rhs.impl_->spost_.c_str());
+    // compile() clears the position types, so use the ones that a compiled
+    // rhs was compiled with.
+    const bool         bCompiled = rhs.impl_->sc_.mempool != nullptr;
+    const std::string& rpost     = bCompiled ? rhs.impl_->compiledRpost_ : rhs.impl_->rpost_;
+    const std::string& spost     = bCompiled ? rhs.impl_->compiledSpost_ : rhs.impl_->spost_;
+    setReferencePosType(rpost.empty() ? PositionCalculationCollection::typeEnumValues[0] : rpost.c_str());
+    setOutputPosType(spost.empty() ? PositionCalculationCollection::typeEnumValues[0] : spost.c_str());
     setDebugLevel(static_cast<int>(rhs.impl_->debugLevel_));
 
+    // Variables are not part of the selection text, so define them first
+    // (in their original order) for the selections that reference them.
+    for (int i = 0; i < rhs.impl_->sc_.nvars; i++)
+    {
+        parseFromString(rhs.impl_->sc_.varstrs[i]);
+    }
     for (size_t i = 0; i < rhs.impl_->sc_.sel.size(); i++)
     {
         const auto& selectionOption = rhs.impl_->sc_.sel[i];
@@ -598,7 +607,7 @@ SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
     }
 
     // Only compile the selection if rhs is compiled.
-    if (rhs.impl_->sc_.mempool != nullptr)
+    if (bCompiled)
     {
         compile();
         // Original ids and covered fraction types are set after
@@ -911,6 +920,8 @@ void SelectionCollection::compile()
             }
         }
     }
+    impl_->compiledRpost_ = impl_->rpost_;
+    impl_->compiledSpost_ = impl_->spost_;
     impl_->rpost_.clear();
     impl_->spost_.clear();
 }
