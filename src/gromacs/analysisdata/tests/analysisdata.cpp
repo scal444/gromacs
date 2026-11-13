@@ -48,7 +48,10 @@
 
 #include "gromacs/analysisdata/analysisdata.h"
 
+#include <exception>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -387,6 +390,82 @@ TYPED_TEST(AnalysisDataCommonTest, CallsModuleCorrectlyWithOutOfOrderFrames)
     ASSERT_NO_THROW_GMX(this->data_.finishFrameSerial(2));
     ASSERT_NO_THROW_GMX(handle1.finishData());
     ASSERT_NO_THROW_GMX(handle2.finishData());
+}
+
+/*
+ * Tests that data is forwarded correctly (in frame order) to serial modules
+ * when frames are added concurrently from multiple threads while earlier
+ * frames are finished serially.
+ */
+TYPED_TEST(AnalysisDataCommonTest, CallsModuleCorrectlyWithConcurrentFrames)
+{
+    ASSERT_NO_THROW_GMX(AnalysisDataTest::addStaticCheckerModule());
+    ASSERT_NO_THROW_GMX(AnalysisDataTest::addStaticStorageCheckerModule(-1));
+    const int                            frameCount = this->input_.frameCount();
+    gmx::AnalysisDataParallelOptions     options(frameCount);
+    std::vector<gmx::AnalysisDataHandle> handles(frameCount);
+    for (gmx::AnalysisDataHandle& handle : handles)
+    {
+        ASSERT_NO_THROW_GMX(handle = this->data_.startData(options));
+    }
+    std::vector<std::exception_ptr> errors(frameCount);
+    std::vector<std::thread>        threads(frameCount);
+    // Start the last frames first to make out-of-order completion likely.
+    for (int i = frameCount - 1; i >= 0; --i)
+    {
+        threads[i] = std::thread(
+                [this, &handles, &errors, i]
+                {
+                    try
+                    {
+                        AnalysisDataTest::presentDataFrame(this->input_, i, handles[i]);
+                    }
+                    catch (...)
+                    {
+                        errors[i] = std::current_exception();
+                    }
+                });
+    }
+    // Finish each frame as soon as it has been added, while later frames
+    // may still be added in other threads.
+    for (int i = 0; i < frameCount; ++i)
+    {
+        threads[i].join();
+        EXPECT_FALSE(errors[i]) << "Adding frame " << i << " threw";
+        EXPECT_NO_THROW_GMX(this->data_.finishFrameSerial(i));
+    }
+    for (gmx::AnalysisDataHandle& handle : handles)
+    {
+        ASSERT_NO_THROW_GMX(handle.finishData());
+    }
+}
+
+/*
+ * Tests that frames for which no data was added are skipped when the data
+ * is processed in parallel, matching serial processing, where no frames are
+ * started for such data.
+ */
+TEST_F(AnalysisDataSimpleTest, SkipsFramesWithoutDataInParallelProcessing)
+{
+    MockAnalysisDataModulePointer mod(
+            new MockAnalysisDataModule(gmx::IAnalysisDataModule::efAllowMulticolumn));
+    using ::testing::_;
+    EXPECT_CALL(*mod, parallelDataStarted(_, _)).WillOnce(::testing::Return(false));
+    EXPECT_CALL(*mod, dataStarted(_)).Times(::testing::AtMost(1));
+    EXPECT_CALL(*mod, frameStarted(_)).Times(0);
+    EXPECT_CALL(*mod, frameFinished(_)).Times(0);
+    EXPECT_CALL(*mod, frameFinishedSerial(_)).Times(0);
+    EXPECT_CALL(*mod, dataFinished());
+    ASSERT_NO_THROW_GMX(data_.addModule(mod));
+
+    gmx::AnalysisDataParallelOptions options(2);
+    gmx::AnalysisDataHandle          handle;
+    ASSERT_NO_THROW_GMX(handle = data_.startData(options));
+    for (size_t i = 0; i < input_.frameCount(); ++i)
+    {
+        ASSERT_NO_THROW_GMX(data_.finishFrameSerial(i));
+    }
+    ASSERT_NO_THROW_GMX(handle.finishData());
 }
 
 /*
