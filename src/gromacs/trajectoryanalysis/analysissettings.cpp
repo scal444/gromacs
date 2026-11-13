@@ -118,6 +118,12 @@ int TrajectoryAnalysisSettings::frflags() const
 }
 
 
+int TrajectoryAnalysisSettings::threadCount() const
+{
+    return impl_->threadCount;
+}
+
+
 void TrajectoryAnalysisSettings::setFlags(unsigned long flags)
 {
     impl_->flags = flags;

@@ -62,7 +62,13 @@ class TrajectoryAnalysisSettings::Impl
 public:
     //! Initializes the default values for the settings object.
     Impl() :
-        timeUnit(TimeUnit::Default), flags(0), frflags(0), bRmPBC(true), bPBC(true), optionsModuleSettings_(nullptr)
+        timeUnit(TimeUnit::Default),
+        flags(0),
+        frflags(0),
+        threadCount(1),
+        bRmPBC(true),
+        bPBC(true),
+        optionsModuleSettings_(nullptr)
     {
     }
 
@@ -74,6 +80,8 @@ public:
     unsigned long flags;
     //! Frame reading flags for the analysis module.
     int frflags;
+    //! Number of threads the analysis may use.
+    int threadCount;
 
     //! Whether to make molecules whole for each frame.
     bool bRmPBC;

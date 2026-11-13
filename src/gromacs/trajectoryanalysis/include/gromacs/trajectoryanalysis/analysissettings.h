@@ -143,8 +143,27 @@ public:
          * TrajectoryAnalysisModule::initAfterFirstFrame(), for example to
          * disable parallelism for option combinations that need data
          * from earlier frames.
+         *
+         * When frames are analyzed concurrently, each call to
+         * TrajectoryAnalysisModule::analyzeFrame() already runs in its own
+         * thread, and should not start more threads.
+         *
+         * \see threadCount()
          */
         efFrameParallel = 1 << 6,
+        /*! \brief
+         * Indicates that the module uses multiple threads internally.
+         *
+         * Set this flag if the module parallelizes its own work (e.g., the
+         * work within a frame, or in
+         * TrajectoryAnalysisModule::finishAnalysis()) using up to
+         * threadCount() threads.  Together with \ref efFrameParallel, this
+         * flag makes the runner provide the option that sets the number of
+         * threads.
+         *
+         * \see threadCount()
+         */
+        efInternalParallel = 1 << 7,
     };
 
     //! Initializes default settings.
@@ -181,6 +200,24 @@ public:
     bool hasRmPBC() const;
     //! Returns the currently set frame flags.
     int frflags() const;
+    /*! \brief
+     * Returns the number of threads the analysis may use.
+     *
+     * Returns the value set by the user, or one if neither
+     * \ref efFrameParallel nor \ref efInternalParallel is set.  The value
+     * can be accessed in TrajectoryAnalysisModule::optionsFinished() and
+     * later.
+     *
+     * The runner owns this thread budget.  If frames are analyzed
+     * concurrently (see \ref efFrameParallel), the threads are used for
+     * analyzing frames, and TrajectoryAnalysisModule::analyzeFrame()
+     * should not start further threads.  Otherwise, a module that sets
+     * \ref efInternalParallel may use this many threads for its own work.
+     * Work done after all frames (e.g., in
+     * TrajectoryAnalysisModule::finishAnalysis()) may always use this many
+     * threads.
+     */
+    int threadCount() const;
 
     /*! \brief
      * Sets flags.

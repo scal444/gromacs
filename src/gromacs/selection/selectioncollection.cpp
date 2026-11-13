@@ -92,22 +92,23 @@ struct t_pbc;
  * gmx_ana_selcollection_t
  */
 
-void gmx_ana_selcollection_t::resolveIndexGroupReference(gmx::SelectionTreeElement* sel,
+void gmx_ana_selcollection_t::resolveIndexGroupReference(gmx::SelectionTreeElement* element,
                                                          gmx_ana_indexgrps_t*       grps)
 {
-    const std::string reference = sel->name();
+    const std::string reference = element->name();
     if (grps == nullptr)
     {
         const auto recorded = resolvedGroups.find(reference);
         if (recorded != resolvedGroups.end())
         {
-            sel->resolveIndexGroupReference(recorded->second.atoms, recorded->second.name, gall.isize);
+            element->resolveIndexGroupReference(recorded->second.atoms, recorded->second.name, gall.isize);
             return;
         }
     }
-    sel->resolveIndexGroupReference(grps, gall.isize);
-    const gmx_ana_index_t& group = sel->u.cgrp;
-    resolvedGroups[reference] = { sel->name(), std::vector<int>(group.index, group.index + group.isize) };
+    element->resolveIndexGroupReference(grps, gall.isize);
+    const gmx_ana_index_t& group = element->u.cgrp;
+    resolvedGroups[reference]    = { element->name(),
+                                     std::vector<int>(group.index, group.index + group.isize) };
 }
 
 namespace gmx

@@ -44,9 +44,9 @@
 #ifndef GMX_SELECTION_SELECTIONCOLLECTION_IMPL_H
 #define GMX_SELECTION_SELECTIONCOLLECTION_IMPL_H
 
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gromacs/onlinehelp/ihelptopic.h"
@@ -126,19 +126,19 @@ struct gmx_ana_selcollection_t
      * resolve the references in copies of the collection, which reparse
      * the selection text after the index groups may have been freed.
      */
-    std::map<std::string, ResolvedIndexGroup> resolvedGroups;
+    std::unordered_map<std::string, ResolvedIndexGroup> resolvedGroups;
 
     /*! \brief
      * Resolves an index group reference and records the result.
      *
-     * \param     sel   Element of type SEL_GROUPREF to resolve.
-     * \param[in] grps  Index groups to use (can be NULL).
+     * \param     element  Element of type SEL_GROUPREF to resolve.
+     * \param[in] grps     Index groups to use (can be NULL).
      * \throws    InconsistentInputError if the reference cannot be resolved.
      *
      * If \p grps is NULL, uses the group recorded earlier for the same
      * reference, if any.
      */
-    void resolveIndexGroupReference(gmx::SelectionTreeElement* sel, gmx_ana_indexgrps_t* grps);
+    void resolveIndexGroupReference(gmx::SelectionTreeElement* element, gmx_ana_indexgrps_t* grps);
 };
 
 namespace gmx

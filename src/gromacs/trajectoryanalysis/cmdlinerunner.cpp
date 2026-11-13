@@ -45,7 +45,6 @@
 #include <cstdio>
 
 #include <condition_variable>
-#include <deque>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -165,6 +164,67 @@ private:
     std::vector<RVec> f_;
 };
 
+/*! \brief
+ * State for analyzing frames in one thread.
+ *
+ * Holds the selections, the thread-local module data and the PBC
+ * structure used for calls to TrajectoryAnalysisModule::analyzeFrame()
+ * from one thread.
+ */
+class FrameAnalysisContext
+{
+public:
+    /*! \brief
+     * Starts thread-local data for analyzing frames.
+     *
+     * \p selections must stay valid for the lifetime of this object, and
+     * are evaluated for each analyzed frame.
+     */
+    FrameAnalysisContext(TrajectoryAnalysisModule*          module,
+                         const AnalysisDataParallelOptions& dataOptions,
+                         SelectionCollection*               selections,
+                         PbcType                            pbcType,
+                         bool                               hasPbc) :
+        module_(*module),
+        selections_(*selections),
+        pbcType_(pbcType),
+        hasPbc_(hasPbc),
+        data_(module->startFrames(dataOptions, *selections))
+    {
+    }
+
+    //! Evaluates the selections for \p frame and analyzes it.
+    void analyze(int frameIndex, t_trxframe* frame)
+    {
+        t_pbc* ppbc = hasPbc_ ? &pbc_ : nullptr;
+        if (ppbc != nullptr)
+        {
+            set_pbc(ppbc, pbcType_, frame->box);
+        }
+        selections_.evaluate(frame, ppbc);
+        module_.analyzeFrame(frameIndex, *frame, ppbc, data_.get());
+    }
+
+    //! Finishes the thread-local data after all frames have been analyzed.
+    void finish()
+    {
+        module_.finishFrames(data_.get());
+        if (data_ != nullptr)
+        {
+            data_->finish();
+        }
+        data_.reset();
+    }
+
+private:
+    TrajectoryAnalysisModule&           module_;
+    SelectionCollection&                selections_;
+    const PbcType                       pbcType_;
+    const bool                          hasPbc_;
+    TrajectoryAnalysisModuleDataPointer data_;
+    t_pbc                               pbc_;
+};
+
 int RunnerModule::run()
 {
     common_.initTopology();
@@ -176,10 +236,16 @@ int RunnerModule::run()
     common_.initFrameIndexGroup();
     module_->initAfterFirstFrame(settings_, common_.frame());
 
-    const bool canRunParallel = settings_.hasFlag(TrajectoryAnalysisSettings::efFrameParallel)
-                                && common_.hasTrajectory();
-    const int threadCount = canRunParallel ? common_.threadCount() : 1;
-    const int nframes = threadCount > 1 ? analyzeFramesParallel(threadCount) : analyzeFramesSerial();
+    const bool isFrameParallel = settings_.hasFlag(TrajectoryAnalysisSettings::efFrameParallel)
+                                 && common_.hasTrajectory();
+    const int threadCount = settings_.threadCount();
+    if (threadCount > 1 && !isFrameParallel
+        && !settings_.hasFlag(TrajectoryAnalysisSettings::efInternalParallel))
+    {
+        fprintf(stderr, "Note: Frames are analyzed serially with these options; -nt is ignored.\n");
+    }
+    const int nframes = (isFrameParallel && threadCount > 1) ? analyzeFramesParallel(threadCount)
+                                                             : analyzeFramesSerial();
 
     if (common_.hasTrajectory())
     {
@@ -201,36 +267,20 @@ int RunnerModule::run()
 
 int RunnerModule::analyzeFramesSerial()
 {
-    const TopologyInformation& topology = common_.topologyInformation();
-
-    t_pbc  pbc;
-    t_pbc* ppbc = settings_.hasPBC() ? &pbc : nullptr;
-
-    int                                 nframes = 0;
-    AnalysisDataParallelOptions         dataOptions;
-    TrajectoryAnalysisModuleDataPointer pdata(module_->startFrames(dataOptions, selections_));
+    FrameAnalysisContext context(module_.get(),
+                                 AnalysisDataParallelOptions(),
+                                 &selections_,
+                                 common_.topologyInformation().pbcType(),
+                                 settings_.hasPBC());
+    int                  nframes = 0;
     do
     {
         common_.initFrame();
-        t_trxframe& frame = common_.frame();
-        if (ppbc != nullptr)
-        {
-            set_pbc(ppbc, topology.pbcType(), frame.box);
-        }
-
-        selections_.evaluate(&frame, ppbc);
-        module_->analyzeFrame(nframes, frame, ppbc, pdata.get());
+        context.analyze(nframes, &common_.frame());
         module_->finishFrameSerial(nframes);
-
         ++nframes;
     } while (common_.readNextFrame());
-    module_->finishFrames(pdata.get());
-    if (pdata.get() != nullptr)
-    {
-        pdata->finish();
-    }
-    pdata.reset();
-
+    context.finish();
     return nframes;
 }
 
@@ -238,13 +288,16 @@ int RunnerModule::analyzeFramesSerial()
  * Runs analyzeFrame() for multiple frames concurrently.
  *
  * The calling thread reads frames, copies them into a ring of
- * \c windowSize frame buffers and queues them for the worker threads.
- * Each worker owns a copy of the selection collection and a
- * TrajectoryAnalysisModuleData object.  Frames are finished with
+ * \c windowSize frame buffers and makes them available to the worker
+ * threads, which take frames in order.  Each worker owns a copy of the
+ * selection collection and a FrameAnalysisContext.  Frames are finished with
  * TrajectoryAnalysisModule::finishFrameSerial() in the calling thread, in
- * frame order.  At most \c windowSize frames are in progress (queued,
- * being analyzed, or analyzed but not yet finished serially) at any time,
- * which is the guarantee that AnalysisDataParallelOptions requires.
+ * frame order.  At most \c windowSize frames are in progress (waiting, being
+ * analyzed, or analyzed but not yet finished serially) at any time, which is
+ * the guarantee that AnalysisDataParallelOptions requires.
+ *
+ * The destructor stops and joins the worker threads, so that exceptions
+ * thrown in the calling thread propagate normally.
  */
 class ParallelFrameAnalyzer
 {
@@ -254,12 +307,7 @@ public:
                           const TopologyInformation&        topology,
                           const SelectionCollection&        selections,
                           int                               threadCount) :
-        module_(*module),
-        pbcType_(topology.pbcType()),
-        hasPbc_(settings.hasPBC()),
-        windowSize_(2 * threadCount),
-        frames_(windowSize_),
-        isAnalyzed_(windowSize_, false)
+        module_(*module), windowSize_(2 * threadCount), frames_(windowSize_), isAnalyzed_(windowSize_, false)
     {
         const AnalysisDataParallelOptions dataOptions(windowSize_);
         workers_.reserve(threadCount);
@@ -267,7 +315,8 @@ public:
         {
             auto worker        = std::make_unique<Worker>();
             worker->selections = std::make_unique<SelectionCollection>(selections);
-            worker->data       = module_.startFrames(dataOptions, *worker->selections);
+            worker->context    = std::make_unique<FrameAnalysisContext>(
+                    module, dataOptions, worker->selections.get(), topology.pbcType(), settings.hasPBC());
             workers_.push_back(std::move(worker));
         }
     }
@@ -284,50 +333,44 @@ public:
         }
     }
 
-    //! Queues a frame for analysis, blocking until a frame buffer is free.
+    //! Makes a frame available for analysis, blocking until a frame buffer is free.
     void analyzeFrame(const t_trxframe& frame)
     {
-        waitUntilFinishedBefore(nextFrame_ - windowSize_ + 1);
-        frames_[nextFrame_ % windowSize_].assign(frame);
+        waitUntilFinishedBefore(frameCount_ - windowSize_ + 1);
+        frames_[frameCount_ % windowSize_].assign(frame);
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            queue_.push_back(nextFrame_);
+            ++frameCount_;
         }
-        ++nextFrame_;
         workAvailable_.notify_one();
     }
 
     /*! \brief
-     * Waits for all queued frames, and finishes the threads and
-     * thread-local data.
+     * Waits for all frames, and finishes the threads and thread-local data.
+     *
+     * Covered fractions computed by the workers are added to \p selections.
      *
      * \returns Number of analyzed frames.
      */
     int finish(SelectionCollection* selections)
     {
-        waitUntilFinishedBefore(nextFrame_);
+        waitUntilFinishedBefore(frameCount_);
         stopThreads();
         for (auto& worker : workers_)
         {
             selections->addCoveredFractionSums(*worker->selections);
-            module_.finishFrames(worker->data.get());
-            if (worker->data != nullptr)
-            {
-                worker->data->finish();
-            }
-            worker->data.reset();
+            worker->context->finish();
         }
-        return nextFrame_;
+        return frameCount_;
     }
 
 private:
     //! Per-thread state.
     struct Worker
     {
-        std::unique_ptr<SelectionCollection> selections;
-        TrajectoryAnalysisModuleDataPointer  data;
-        t_pbc                                pbc;
-        std::thread                          thread;
+        std::unique_ptr<SelectionCollection>  selections;
+        std::unique_ptr<FrameAnalysisContext> context;
+        std::thread                           thread;
     };
 
     void workerLoop(Worker* worker)
@@ -337,24 +380,17 @@ private:
             int frameIndex = 0;
             {
                 std::unique_lock<std::mutex> lock(mutex_);
-                workAvailable_.wait(lock, [this] { return !queue_.empty() || bStop_ || error_; });
-                if (queue_.empty() || error_)
+                workAvailable_.wait(
+                        lock, [this] { return nextToAnalyze_ < frameCount_ || bStop_ || error_; });
+                if (nextToAnalyze_ >= frameCount_ || error_)
                 {
                     return;
                 }
-                frameIndex = queue_.front();
-                queue_.pop_front();
+                frameIndex = nextToAnalyze_++;
             }
             try
             {
-                t_trxframe& frame = frames_[frameIndex % windowSize_].frame;
-                t_pbc*      ppbc  = hasPbc_ ? &worker->pbc : nullptr;
-                if (ppbc != nullptr)
-                {
-                    set_pbc(ppbc, pbcType_, frame.box);
-                }
-                worker->selections->evaluate(&frame, ppbc);
-                module_.analyzeFrame(frameIndex, frame, ppbc, worker->data.get());
+                worker->context->analyze(frameIndex, &frames_[frameIndex % windowSize_].frame);
             }
             catch (...)
             {
@@ -406,9 +442,10 @@ private:
     {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            // Frames still queued here are only abandoned after an error.
-            queue_.clear();
-            bStop_ = true;
+            // Frames not yet taken by a worker here are only abandoned
+            // after an error.
+            nextToAnalyze_ = frameCount_;
+            bStop_         = true;
         }
         workAvailable_.notify_all();
         for (auto& worker : workers_)
@@ -421,8 +458,6 @@ private:
     }
 
     TrajectoryAnalysisModule& module_;
-    const PbcType             pbcType_;
-    const bool                hasPbc_;
     //! Maximum number of frames in progress at any time.
     const int windowSize_;
     //! Frame buffers, frame \c i is stored at \c i % windowSize_.
@@ -430,22 +465,30 @@ private:
     //! Per-thread state; the pointers keep the addresses stable.
     std::vector<std::unique_ptr<Worker>> workers_;
 
-    //! Guards \a queue_, \a isAnalyzed_, \a bStop_ and \a error_.
+    //! Guards the members below, except where noted.
     std::mutex              mutex_;
     std::condition_variable workAvailable_;
     std::condition_variable frameAnalyzed_;
-    //! Frames waiting to be analyzed.
-    std::deque<int> queue_;
+    /*! \brief
+     * Number of frames made available for analysis.
+     *
+     * Only modified by the calling thread, which can read it without
+     * locking.
+     */
+    int frameCount_ = 0;
+    //! Index of the next frame for a worker to analyze.
+    int nextToAnalyze_ = 0;
     //! Whether the frame in each buffer has been analyzed.
     std::vector<bool> isAnalyzed_;
     //! Whether worker threads should exit.
     bool bStop_ = false;
     //! First exception thrown in a worker thread.
     std::exception_ptr error_;
-
-    //! Index of the next frame to queue (only accessed by the calling thread).
-    int nextFrame_ = 0;
-    //! Index of the next frame to finish serially (only modified by the calling thread).
+    /*! \brief
+     * Index of the next frame to finish serially.
+     *
+     * Only accessed by the calling thread.
+     */
     int nextToFinish_ = 0;
 };
 

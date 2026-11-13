@@ -42,6 +42,7 @@
 
 #include "runnercommon.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include <algorithm>
@@ -134,8 +135,6 @@ public:
     bool        bStartTimeSet_;
     bool        bEndTimeSet_;
     bool        bDeltaTimeSet_;
-    //! Number of threads to use for analyzing frames concurrently.
-    int threadCount_;
 
     bool bTrajOpen_;
     //! The current frame, or \p NULL if no frame loaded yet.
@@ -156,7 +155,6 @@ TrajectoryAnalysisRunnerCommon::Impl::Impl(TrajectoryAnalysisSettings* settings)
     bStartTimeSet_(false),
     bEndTimeSet_(false),
     bDeltaTimeSet_(false),
-    threadCount_(1),
     bTrajOpen_(false),
     fr(nullptr),
     gpbc_(nullptr),
@@ -383,11 +381,12 @@ void TrajectoryAnalysisRunnerCommon::initOptions(IOptionsContainer* options, Tim
 
     // The option is accepted by all tools so that scripts can pass it
     // uniformly, but only shown for tools that can use it.
+    const bool canUseThreads = settings.hasFlag(TrajectoryAnalysisSettings::efFrameParallel)
+                               || settings.hasFlag(TrajectoryAnalysisSettings::efInternalParallel);
     options->addOption(IntegerOption("nt")
-                               .store(&impl_->threadCount_)
-                               .hidden(!settings.hasFlag(TrajectoryAnalysisSettings::efFrameParallel))
-                               .description("Number of threads for analyzing frames "
-                                            "concurrently"));
+                               .store(&settings.impl_->threadCount)
+                               .hidden(!canUseThreads)
+                               .description("Number of threads to use for analysis"));
 
     // Add plot options.
     settings.impl_->plotSettings.initOptions(options);
@@ -415,9 +414,16 @@ void TrajectoryAnalysisRunnerCommon::optionsFinished()
         GMX_THROW(InconsistentInputError("No trajectory or topology provided, nothing to do!"));
     }
 
-    if (impl_->threadCount_ < 1)
+    if (impl_->settings_.threadCount() < 1)
     {
         GMX_THROW(InvalidInputError("Number of threads (-nt) must be at least one"));
+    }
+    const bool canUseThreads = impl_->settings_.hasFlag(TrajectoryAnalysisSettings::efFrameParallel)
+                               || impl_->settings_.hasFlag(TrajectoryAnalysisSettings::efInternalParallel);
+    if (!canUseThreads && impl_->settings_.threadCount() > 1)
+    {
+        fprintf(stderr, "Note: This tool does not use multiple threads; -nt is ignored.\n");
+        impl_->settings_.impl_->threadCount = 1;
     }
 
     if (impl_->trajectoryGroup_.isValid() && impl_->trjfile_.empty())
@@ -483,12 +489,6 @@ void TrajectoryAnalysisRunnerCommon::initFrame()
     {
         gmx_rmpbc_trxfr(impl_->gpbc_, impl_->fr);
     }
-}
-
-
-int TrajectoryAnalysisRunnerCommon::threadCount() const
-{
-    return impl_->threadCount_;
 }
 
 
