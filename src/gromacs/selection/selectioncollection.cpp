@@ -544,6 +544,18 @@ SelectionCollection::~SelectionCollection() = default;
 SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
     impl_(std::make_unique<Impl>())
 {
+    if (rhs.impl_->originalSelections_.has_value())
+    {
+        impl_->originalSelections_ = rhs.impl_->originalSelections_;
+    }
+    else
+    {
+        impl_->originalSelections_.emplace();
+        for (const auto& selectionData : rhs.impl_->sc_.sel)
+        {
+            impl_->originalSelections_->emplace_back(selectionData.get());
+        }
+    }
     setReferencePosType(rhs.impl_->rpost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
                                                   : rhs.impl_->rpost_.c_str());
     setOutputPosType(rhs.impl_->spost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
@@ -927,6 +939,30 @@ void SelectionCollection::evaluate(t_trxframe* fr, t_pbc* pbc)
     }
 }
 
+
+Selection SelectionCollection::mapSelection(const Selection& selection) const
+{
+    GMX_RELEASE_ASSERT(selection.isValid(), "Cannot map an invalid selection");
+    const auto& ownSelections = impl_->sc_.sel;
+    if (!impl_->originalSelections_.has_value())
+    {
+        GMX_RELEASE_ASSERT(std::any_of(ownSelections.begin(),
+                                       ownSelections.end(),
+                                       [&selection](const auto& selectionData)
+                                       { return Selection(selectionData.get()) == selection; }),
+                           "Selection does not belong to this collection");
+        return selection;
+    }
+    // Look the selection up by identity rather than by name, because
+    // selection names need not be unique.  Copying preserves the order of
+    // the selections, so the copy is at the same index.
+    const SelectionList& originalSelections = *impl_->originalSelections_;
+    const auto found = std::find(originalSelections.begin(), originalSelections.end(), selection);
+    GMX_RELEASE_ASSERT(found != originalSelections.end(),
+                       "Selection does not belong to the original collection");
+    const auto index = std::distance(originalSelections.begin(), found);
+    return Selection(ownSelections[index].get());
+}
 
 void SelectionCollection::evaluateFinal(int nframes)
 {

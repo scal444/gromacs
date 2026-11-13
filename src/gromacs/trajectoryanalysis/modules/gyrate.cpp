@@ -188,7 +188,7 @@ void Gyrate::initAnalysis(const TrajectoryAnalysisSettings& settings, const Topo
 
 void Gyrate::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* pbc, TrajectoryAnalysisModuleData* pdata)
 {
-    const Selection&   sel       = TrajectoryAnalysisModuleData::parallelSelection(sel_);
+    const Selection&   sel       = pdata->parallelSelection(sel_);
     AnalysisDataHandle gyrHandle = pdata->dataHandle(gyrate_);
 
     real weighTotal           = 0.;

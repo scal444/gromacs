@@ -404,6 +404,22 @@ public:
      */
     [[nodiscard]] std::optional<Selection> selection(std::string_view selName) const;
     /*! \brief
+     * Returns this collection's copy of a selection from the original collection.
+     *
+     * Copying a collection also copies its selections, but existing Selection
+     * handles still refer to the originals.  Use this to get the handle to the
+     * copy, whose values reflect evaluation of this collection.
+     *
+     * If this collection is a copy, \p selection must belong to the original
+     * collection, which is the collection that was first copied when copies
+     * are made of copies.  If this collection is not a copy, \p selection
+     * must belong to it, and is returned as is.
+     *
+     * Analysis modules should use
+     * TrajectoryAnalysisModuleData::parallelSelection() instead.
+     */
+    [[nodiscard]] Selection mapSelection(const Selection& selection) const;
+    /*! \brief
      * Prints a human-readable version of the internal selection element
      * tree.
      *

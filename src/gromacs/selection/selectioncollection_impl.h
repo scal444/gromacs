@@ -45,6 +45,7 @@
 #define GMX_SELECTION_SELECTIONCOLLECTION_IMPL_H
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -192,6 +193,14 @@ public:
     bool bExternalGroupsSet_;
     //! External index groups (can be NULL).
     gmx_ana_indexgrps_t* grps_;
+    /*! \brief
+     * Selections of the original collection, if this collection is a copy.
+     *
+     * For a copy of a copy, these are the selections of the collection that
+     * was first copied, so that handles to the original selections can be
+     * mapped to any copy.
+     */
+    std::optional<SelectionList> originalSelections_;
 };
 
 /*! \internal
