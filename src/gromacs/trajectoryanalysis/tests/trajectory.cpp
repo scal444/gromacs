@@ -54,6 +54,7 @@
 #include "gromacs/utility/arrayref.h"
 
 #include "testutils/cmdlinetest.h"
+#include "testutils/testasserts.h"
 #include "testutils/textblockmatchers.h"
 
 #include "moduletest.h"
@@ -106,6 +107,13 @@ TEST_F(TrajectoryModuleTest, WritesCoordinatesVelocitiesAndForces)
     includeDataset("x");
     includeDataset("v");
     includeDataset("f");
+    // The .trr contains only single-precision values, so even from a
+    // double-precision build the output should conform to tolerances
+    // suitable for single-precision values.
+    const auto tolerance = gmx::test::defaultFloatTolerance();
+    setDatasetTolerance("x", tolerance);
+    setDatasetTolerance("v", tolerance);
+    setDatasetTolerance("f", tolerance);
     runTest(CommandLine(cmdline));
 }
 
