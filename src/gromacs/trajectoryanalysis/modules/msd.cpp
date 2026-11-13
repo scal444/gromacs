@@ -137,6 +137,12 @@ public:
         }
         return MsdColumnProxy(&msds_[index]);
     }
+    /*! \brief Initializes the columns for all tau indices up to and including \p index.
+     *
+     * After this call, operator[] does not modify the container for indices up to \p index,
+     * so distinct columns can be filled concurrently.
+     */
+    void initColumns(size_t index) { (*this)[index]; }
     /*! \brief Compute per-tau MSDs averaged over all added points.
      *
      * The resulting vector is size(max tau index). Any indices
@@ -452,6 +458,8 @@ private:
     double maxTau_ = std::numeric_limits<double>::max();
     //! Tracks the index of the first valid frame. Starts at 0, increases as old frames are deleted
     size_t firstValidFrame_ = 0;
+    //! Number of threads to use for comparing a frame against the stored reference frames.
+    int threadCount_ = 1;
 
     //! First tau value to fit from for diffusion coefficient, defaults to 0.1 * max tau
     real beginFit_ = -1.0;
@@ -529,9 +537,12 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
         "sampling, often manifesting as a wobbly line on the MSD plot after a straighter region at",
         "lower time deltas. The [TT]-maxtau[TT] option can be used to cap the maximum time delta",
         "for frame comparison, which may improve performance and can be used to avoid",
-        "out-of-memory issues.[PAR]"
+        "out-of-memory issues.[PAR]",
+        "With [TT]-nt[tt], each frame is compared against the stored frames in multiple threads.",
+        "The results do not depend on the number of threads."
     };
     settings->setHelpText(desc);
+    settings->setFlag(TrajectoryAnalysisSettings::efInternalParallel);
 
     // Selections
     options->addOption(SelectionOption("sel")
@@ -582,8 +593,9 @@ void Msd::initOptions(IOptionsContainer* options, TrajectoryAnalysisSettings* se
                     .description("Report diffusion coefficients for each molecule in selection"));
 }
 
-void Msd::optionsFinished(TrajectoryAnalysisSettings gmx_unused* settings)
+void Msd::optionsFinished(TrajectoryAnalysisSettings* settings)
 {
+    threadCount_ = settings->threadCount();
     if (singleDimType_ != SingleDimDiffType::Unused && twoDimType_ != TwoDimDiffType::Unused)
     {
         std::string errorMessage =
@@ -724,31 +736,58 @@ void Msd::analyzeFrame(int gmx_unused                frameNumber,
 
         ArrayRef<const DVec> coords = msdData.coordinateManager_.buildCoordinates(sel, pbc);
 
-        // For each preceding frame, calculate tau and do comparison.
+        // Drop the reference frames that are too old. tau decreases with the reference frame
+        // index, so these frames are always at the beginning.
         for (size_t i = firstValidFrame_; i < msdData.frames.size(); i++)
         {
-            auto& [referenceFrameNumber, referenceFrame] = msdData.frames[i];
-
             const double tau = time - (t0_ + trestart_ * i);
-            if (tau > maxTau_)
+            if (tau <= maxTau_)
             {
-                // The (now empty) entry is no longer needed, so over time the outer vector will
-                // grow with extraneous empty elements persisting, but the alternative would require
-                // some more complicated remapping of tau to frame index.
-                referenceFrame.clear();
-                firstValidFrame_ = i + 1;
-                continue;
+                break;
             }
-            const size_t tauIndex = frameNumber - referenceFrameNumber;
+            // The (now empty) entry is no longer needed, so over time the outer vector will
+            // grow with extraneous empty elements persisting, but the alternative would require
+            // some more complicated remapping of tau to frame index.
+            msdData.frames[i].second.clear();
+            firstValidFrame_ = i + 1;
+        }
 
-            msdData.msds[tauIndex].push_back(calcMsd_(coords, referenceFrame));
-
-            for (size_t molInd = 0; molInd < molecules_.size(); molInd++)
+        // For each preceding frame, do comparison. Each reference frame has a different tau, so
+        // each one adds a value to a different column, and the values in each column are added
+        // in frame order independent of the number of threads.
+        const int firstFrame = static_cast<int>(firstValidFrame_);
+        const int numFrames  = static_cast<int>(msdData.frames.size());
+        if (firstFrame < numFrames)
+        {
+            // The oldest reference frame has the largest tau.
+            const size_t maxTauIndex = frameNumber - msdData.frames[firstFrame].first;
+            msdData.msds.initColumns(maxTauIndex);
+            for (MoleculeData& molecule : molecules_)
             {
-                molecules_[molInd].msdData[tauIndex].push_back(
-                        calcMsd_(arrayRefFromArray(&coords[molInd], 1),
-                                 arrayRefFromArray(&referenceFrame[molInd], 1)));
+                molecule.msdData.initColumns(maxTauIndex);
             }
+        }
+        // Unused when OpenMP is disabled.
+        gmx_unused const int numThreads = std::max(1, std::min(threadCount_, numFrames - firstFrame));
+#pragma omp parallel for num_threads(numThreads) schedule(static)
+        for (int i = firstFrame; i < numFrames; i++)
+        {
+            try
+            {
+                const auto& [referenceFrameNumber, referenceFrame] = msdData.frames[i];
+
+                const size_t tauIndex = frameNumber - referenceFrameNumber;
+
+                msdData.msds[tauIndex].push_back(calcMsd_(coords, referenceFrame));
+
+                for (size_t molInd = 0; molInd < molecules_.size(); molInd++)
+                {
+                    molecules_[molInd].msdData[tauIndex].push_back(
+                            calcMsd_(arrayRefFromArray(&coords[molInd], 1),
+                                     arrayRefFromArray(&referenceFrame[molInd], 1)));
+                }
+            }
+            GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
         }
 
 

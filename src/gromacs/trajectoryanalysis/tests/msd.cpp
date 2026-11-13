@@ -204,6 +204,13 @@ public:
         cmdline.addOption("-s", tpr.c_str());
     }
 
+    /*! \brief Runs the module with \p threadCount threads.
+     *
+     * The option is not part of the command line checked against the reference data, so
+     * that threaded tests can use the same reference data as serial tests.
+     */
+    void setThreadCount(int threadCount) { commandLine().addOption("-nt", threadCount); }
+
     // Convenience function to set input trajectory, tpr, and index, if all of the input files
     // share a common prefix.
     void setAllInputs(const std::string& prefix)
@@ -341,6 +348,42 @@ TEST_F(MsdModuleTest, endFit)
 {
     setAllInputs("alanine_vsite_solvated");
     const char* const cmdline[] = { "-trestart", "2", "-sel", "3", "-endfit", "25" };
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, multipleGroupsWithMaxTau)
+{
+    setAllInputs("alanine_vsite_solvated");
+    const char* const cmdline[] = { "-trestart", "2", "-maxtau", "10", "-sel", "1;2" };
+    runTest(CommandLine(cmdline));
+}
+
+// -------------------------------------------------------------------------
+// These tests compare frames against the reference frames in multiple threads, and use the
+// same reference data as the corresponding serial tests above.
+// ------------------------------------------------------------------------
+TEST_F(MsdModuleTest, multipleGroupsWorkWithThreads)
+{
+    setAllInputs("alanine_vsite_solvated");
+    setThreadCount(4);
+    const char* const cmdline[] = { "-trestart", "2", "-sel", "1;2" };
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, multipleGroupsWithMaxTauWithThreads)
+{
+    setAllInputs("alanine_vsite_solvated");
+    setThreadCount(4);
+    const char* const cmdline[] = { "-trestart", "2", "-maxtau", "10", "-sel", "1;2" };
+    runTest(CommandLine(cmdline));
+}
+
+TEST_F(MsdModuleTest, molTestWithThreads)
+{
+    setAllInputs("alanine_vsite_solvated");
+    setOutputFile("-mol", "diff_mol.xvg", MsdMatch());
+    setThreadCount(3);
+    const char* const cmdline[] = { "-trestart", "10", "-sel", "3" };
     runTest(CommandLine(cmdline));
 }
 
