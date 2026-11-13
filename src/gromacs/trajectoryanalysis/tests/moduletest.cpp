@@ -223,8 +223,9 @@ void AbstractTrajectoryAnalysisModuleTestFixture::runTest(const CommandLine& arg
     TestReferenceChecker rootChecker(this->rootChecker());
     rootChecker.checkString(args.toString(), "CommandLine");
     // Added after the check so that threaded runs compare against the
-    // same reference data as serial runs.
-    if (s_analysisThreadCount > 0)
+    // same reference data as serial runs.  Tests that set -nt themselves
+    // keep their value.
+    if (s_analysisThreadCount > 0 && !cmdline.contains("-nt"))
     {
         cmdline.append("-nt");
         cmdline.append(std::to_string(s_analysisThreadCount));
