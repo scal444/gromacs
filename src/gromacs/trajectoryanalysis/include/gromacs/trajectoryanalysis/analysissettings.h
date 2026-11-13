@@ -137,16 +137,20 @@ public:
          * and must access selections through
          * TrajectoryAnalysisModuleData::parallelSelection().
          * Output written through AnalysisData objects is still processed
-         * in frame order.
+         * in frame order.  TopologyInformation methods that initialize data
+         * on first use (e.g., TopologyInformation::atoms()) must not be
+         * called from analyzeFrame(); call them in
+         * TrajectoryAnalysisModule::initAnalysis() instead.
          *
-         * The flag can be set or cleared up to and including
-         * TrajectoryAnalysisModule::initAfterFirstFrame(), for example to
-         * disable parallelism for option combinations that need data
-         * from earlier frames.
+         * Each call to analyzeFrame() runs in its own thread and must not
+         * start more threads, so this flag cannot be combined with
+         * \ref efInternalParallel.
          *
-         * When frames are analyzed concurrently, each call to
-         * TrajectoryAnalysisModule::analyzeFrame() already runs in its own
-         * thread, and should not start more threads.
+         * The flag must be set in TrajectoryAnalysisModule::initOptions()
+         * for the runner to provide the option that sets the number of
+         * threads.  It can be cleared in
+         * TrajectoryAnalysisModule::optionsFinished(), for example for
+         * option combinations that need data from earlier frames.
          *
          * \see threadCount()
          */
@@ -157,9 +161,13 @@ public:
          * Set this flag if the module parallelizes its own work (e.g., the
          * work within a frame, or in
          * TrajectoryAnalysisModule::finishAnalysis()) using up to
-         * threadCount() threads.  Together with \ref efFrameParallel, this
-         * flag makes the runner provide the option that sets the number of
-         * threads.
+         * threadCount() threads.  Frames are then analyzed one at a time,
+         * so this flag cannot be combined with \ref efFrameParallel.
+         *
+         * The flag must be set in TrajectoryAnalysisModule::initOptions()
+         * for the runner to provide the option that sets the number of
+         * threads.  It can be cleared in
+         * TrajectoryAnalysisModule::optionsFinished().
          *
          * \see threadCount()
          */
@@ -203,19 +211,17 @@ public:
     /*! \brief
      * Returns the number of threads the analysis may use.
      *
-     * Returns the value set by the user, or one if neither
-     * \ref efFrameParallel nor \ref efInternalParallel is set.  The value
-     * can be accessed in TrajectoryAnalysisModule::optionsFinished() and
-     * later.
+     * Returns the value set by the user.  After
+     * TrajectoryAnalysisModule::optionsFinished(), returns one if neither
+     * \ref efFrameParallel nor \ref efInternalParallel is set.
      *
-     * The runner owns this thread budget.  If frames are analyzed
-     * concurrently (see \ref efFrameParallel), the threads are used for
-     * analyzing frames, and TrajectoryAnalysisModule::analyzeFrame()
-     * should not start further threads.  Otherwise, a module that sets
-     * \ref efInternalParallel may use this many threads for its own work.
-     * Work done after all frames (e.g., in
-     * TrajectoryAnalysisModule::finishAnalysis()) may always use this many
-     * threads.
+     * The runner owns this thread budget.  With \ref efFrameParallel, the
+     * runner uses the threads to analyze frames concurrently, and
+     * TrajectoryAnalysisModule::analyzeFrame() must not start threads.
+     * With \ref efInternalParallel, frames are analyzed one at a time and
+     * the module may use this many threads for its own work.  Work done
+     * after all frames (e.g., in TrajectoryAnalysisModule::finishAnalysis())
+     * may use this many threads in either case.
      */
     int threadCount() const;
 

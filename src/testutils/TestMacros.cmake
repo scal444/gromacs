@@ -291,6 +291,8 @@ endfunction()
 #                         currently this label is used to select tests for CUDA Compute Sanitizer runs.
 #   SLOW_GPU_TEST         marks all other tests that should run on a GPU, used to make sure GPU CI only runs GPU
 #                         tests and doesn't waste time on others.
+#   EXTRA_ARGS <args...>  passes additional command-line arguments to the test binary (e.g., test
+#                         options to register the same binary again with a different configuration).
 #
 # TODO When a test case needs it, generalize the MPI_RANKS mechanism so
 # that ctest can run the test binary over a range of numbers of MPI
@@ -299,7 +301,8 @@ function (gmx_register_gtest_test NAME EXENAME)
     if (BUILD_TESTING)
         set(_options INTEGRATION_TEST SLOW_TEST IGNORE_LEAKS QUICK_GPU_TEST SLOW_GPU_TEST)
         set(_one_value_args MPI_RANKS OPENMP_THREADS)
-        cmake_parse_arguments(ARG "${_options}" "${_one_value_args}" "" ${ARGN})
+        set(_multi_value_args EXTRA_ARGS)
+        cmake_parse_arguments(ARG "${_options}" "${_one_value_args}" "${_multi_value_args}" ${ARGN})
         set(_xml_path ${CMAKE_BINARY_DIR}/Testing/Temporary/${NAME}.xml)
         set(_labels GTest)
         set(_timeout 30)
@@ -332,7 +335,7 @@ function (gmx_register_gtest_test NAME EXENAME)
         if (ARG_IGNORE_LEAKS)
             gmx_get_test_prefix_cmd(_prefix_cmd IGNORE_LEAKS)
         endif ()
-        set(_cmd ${_prefix_cmd} $<TARGET_FILE:${EXENAME}>)
+        set(_cmd ${_prefix_cmd} $<TARGET_FILE:${EXENAME}> ${ARG_EXTRA_ARGS})
         if (ARG_OPENMP_THREADS)
             if (GMX_OPENMP)
                 list(APPEND _cmd -ntomp ${ARG_OPENMP_THREADS})

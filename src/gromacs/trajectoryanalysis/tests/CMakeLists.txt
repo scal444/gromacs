@@ -59,6 +59,9 @@ gmx_add_gtest_executable(trajectoryanalysis-test
         $<TARGET_OBJECTS:mdrun_objlib>
         )
 gmx_register_gtest_test(TrajectoryAnalysisUnitTests trajectoryanalysis-test SLOW_TEST)
+# Run all module tests again with frames analyzed in multiple threads.
+gmx_register_gtest_test(TrajectoryAnalysisThreadedUnitTests trajectoryanalysis-test SLOW_TEST
+                        EXTRA_ARGS -analysis-nt 3)
 target_link_libraries(trajectoryanalysis-test PRIVATE analysisdata-test-shared)
 target_link_libraries(trajectoryanalysis-test PRIVATE common)
 

@@ -125,6 +125,7 @@ void RunnerModule::optionsFinished()
 {
     common_.optionsFinished();
     module_->optionsFinished(&settings_);
+    common_.moduleOptionsFinished();
 }
 
 /*! \brief

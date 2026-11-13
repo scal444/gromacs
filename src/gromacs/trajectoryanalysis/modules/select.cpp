@@ -315,7 +315,14 @@ private:
     PdbAtomsSelection pdbAtoms_;
 
     //! The input topology.
-    const TopologyInformation*        top_;
+    const TopologyInformation* top_;
+    /*! \brief
+     * Atoms of the topology, if residue numbers are needed for output.
+     *
+     * Initialized in initAnalysis(), because TopologyInformation::atoms()
+     * is not safe to call concurrently from analyzeFrame().
+     */
+    const t_atoms*                    atoms_;
     std::vector<int>                  totsize_;
     AnalysisData                      sdata_;
     AnalysisData                      cdata_;
@@ -333,6 +340,7 @@ Select::Select() :
     resNumberType_(ResidueNumbering::ByNumber),
     pdbAtoms_(PdbAtomsSelection::All),
     top_(nullptr),
+    atoms_(nullptr),
     occupancyModule_(new AnalysisDataAverageModule()),
     lifetimeModule_(new AnalysisDataLifetimeModule())
 {
@@ -622,6 +630,12 @@ void Select::initAnalysis(const TrajectoryAnalysisSettings& settings, const Topo
     }
 
     top_ = &top;
+    if (!bResInd_
+        && std::any_of(
+                sel_.begin(), sel_.end(), [](const Selection& s) { return s.type() == INDEX_RES; }))
+    {
+        atoms_ = top.atoms();
+    }
 }
 
 
@@ -662,7 +676,7 @@ void Select::analyzeFrame(int frnr, const t_trxframe& fr, t_pbc* /* pbc */, Traj
             const SelectionPosition& p = sel[g].position(i);
             if (sel[g].type() == INDEX_RES && !bResInd_)
             {
-                idh.setPoint(1, top_->atoms()->resinfo[p.mappedId()].nr);
+                idh.setPoint(1, atoms_->resinfo[p.mappedId()].nr);
             }
             else
             {

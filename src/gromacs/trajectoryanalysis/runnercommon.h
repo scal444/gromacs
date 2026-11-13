@@ -116,6 +116,14 @@ public:
      * Currently, makes molecules whole if requested.
      */
     void initFrame();
+    /*! \brief
+     * Checks the threading settings after the module has processed its
+     * options.
+     *
+     * Must be called after TrajectoryAnalysisModule::optionsFinished(),
+     * which may clear the threading flags.
+     */
+    void moduleOptionsFinished();
 
     //! Returns true if input data comes from a trajectory.
     bool hasTrajectory() const;

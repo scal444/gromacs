@@ -418,13 +418,6 @@ void TrajectoryAnalysisRunnerCommon::optionsFinished()
     {
         GMX_THROW(InvalidInputError("Number of threads (-nt) must be at least one"));
     }
-    const bool canUseThreads = impl_->settings_.hasFlag(TrajectoryAnalysisSettings::efFrameParallel)
-                               || impl_->settings_.hasFlag(TrajectoryAnalysisSettings::efInternalParallel);
-    if (!canUseThreads && impl_->settings_.threadCount() > 1)
-    {
-        fprintf(stderr, "Note: This tool does not use multiple threads; -nt is ignored.\n");
-        impl_->settings_.impl_->threadCount = 1;
-    }
 
     if (impl_->trajectoryGroup_.isValid() && impl_->trjfile_.empty())
     {
@@ -480,6 +473,23 @@ bool TrajectoryAnalysisRunnerCommon::readNextFrame()
         impl_->finishTrajectory();
     }
     return bContinue;
+}
+
+
+void TrajectoryAnalysisRunnerCommon::moduleOptionsFinished()
+{
+    const TrajectoryAnalysisSettings& settings = impl_->settings_;
+    const bool frameParallel    = settings.hasFlag(TrajectoryAnalysisSettings::efFrameParallel);
+    const bool internalParallel = settings.hasFlag(TrajectoryAnalysisSettings::efInternalParallel);
+    if (frameParallel && internalParallel)
+    {
+        GMX_THROW(APIError("efFrameParallel and efInternalParallel cannot both be set"));
+    }
+    if (!frameParallel && !internalParallel && settings.threadCount() > 1)
+    {
+        fprintf(stderr, "Note: This tool does not use multiple threads; -nt is ignored.\n");
+        impl_->settings_.impl_->threadCount = 1;
+    }
 }
 
 
