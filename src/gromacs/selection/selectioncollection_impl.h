@@ -192,6 +192,8 @@ public:
     bool bExternalGroupsSet_;
     //! External index groups (can be NULL).
     gmx_ana_indexgrps_t* grps_;
+    //! Collection from which this collection was copied (can be NULL).
+    const SelectionCollection* source_ = nullptr;
 };
 
 /*! \internal

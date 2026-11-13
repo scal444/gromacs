@@ -544,6 +544,7 @@ SelectionCollection::~SelectionCollection() = default;
 SelectionCollection::SelectionCollection(const SelectionCollection& rhs) :
     impl_(std::make_unique<Impl>())
 {
+    impl_->source_ = &rhs;
     setReferencePosType(rhs.impl_->rpost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
                                                   : rhs.impl_->rpost_.c_str());
     setOutputPosType(rhs.impl_->spost_.empty() ? PositionCalculationCollection::typeEnumValues[0]
@@ -927,6 +928,30 @@ void SelectionCollection::evaluate(t_trxframe* fr, t_pbc* pbc)
     }
 }
 
+
+Selection SelectionCollection::mapSelection(const Selection& selection) const
+{
+    if (impl_->source_ == nullptr)
+    {
+        return selection;
+    }
+    const auto& ownSelections    = impl_->sc_.sel;
+    const auto& sourceSelections = impl_->source_->impl_->sc_.sel;
+    GMX_RELEASE_ASSERT(sourceSelections.size() == ownSelections.size(),
+                       "Collection is not a copy of the source collection");
+    // Look the selection up by identity rather than by name, because
+    // selection names need not be unique.  Copying preserves the order of
+    // the selections, so the copy is at the same index.
+    for (size_t i = 0; i < sourceSelections.size(); ++i)
+    {
+        if (Selection(sourceSelections[i].get()) == selection)
+        {
+            return Selection(ownSelections[i].get());
+        }
+    }
+    GMX_RELEASE_ASSERT(false, "Selection does not belong to the source collection");
+    return Selection();
+}
 
 void SelectionCollection::evaluateFinal(int nframes)
 {
