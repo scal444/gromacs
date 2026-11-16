@@ -198,6 +198,13 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
         wwmass = 0;
         clear_dvec(radf_fac0);
         clear_dvec(radf_fac1);
+        /* Sums that are only needed for the virial */
+        DVec                  sumMassWeightRadial = { 0.0, 0.0, 0.0 };
+        DVec                  radf_fac2           = { 0.0, 0.0, 0.0 };
+        std::array<DVec, DIM> radialTimesMdw      = { DVec{ 0.0, 0.0, 0.0 },
+                                                      DVec{ 0.0, 0.0, 0.0 },
+                                                      DVec{ 0.0, 0.0, 0.0 } };
+        std::array<DVec, DIM> radialTimesMdwAxial = radialTimesMdw;
 
         if (pcrd.params_.eGeom == PullGroupGeometry::Cylinder)
         {
@@ -274,6 +281,13 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
                     {
                         radf_fac0[m] += mdw[m];
                         radf_fac1[m] += mdw[m] * axialLocation;
+                        radf_fac2[m] += mdw[m] * axialLocation * axialLocation;
+                        sumMassWeightRadial[m] += mass * weight * radialLocation[m];
+                        for (int n = 0; n < DIM; n++)
+                        {
+                            radialTimesMdw[m][n] += radialLocation[m] * mdw[n];
+                            radialTimesMdwAxial[m][n] += radialLocation[m] * mdw[n] * axialLocation;
+                        }
                     }
                 }
                 else
@@ -298,6 +312,17 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
         buffer[6] = radf_fac1[XX];
         buffer[7] = radf_fac1[YY];
         buffer[8] = radf_fac1[ZZ];
+
+        for (int m = 0; m < DIM; m++)
+        {
+            buffer[9 + m]  = radf_fac2[m];
+            buffer[12 + m] = sumMassWeightRadial[m];
+            for (int n = 0; n < DIM; n++)
+            {
+                buffer[15 + m * DIM + n] = radialTimesMdw[m][n];
+                buffer[24 + m * DIM + n] = radialTimesMdwAxial[m][n];
+            }
+        }
     }
 
     if (mpiComm.isParallel())
@@ -358,6 +383,34 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
             for (int m = 0; m < DIM; m++)
             {
                 spatialData.ffrad[m] = (buffer[6 + m] + buffer[3 + m] * spatialData.cyl_dev) / wmass;
+            }
+
+            /* Compute the virial -0.5 sum_i (x_i - x_pull) (x) f_i divided by
+             * -0.5 times the scalar force. Here x_pull is the COM of the pull group,
+             * i runs over the atoms in the cylinder group and
+             *   f_i = -scalarForce*(m_i*w_i*vec + mdw_i*(a_i + cyl_dev))/wmass
+             * with a_i the axial location of atom i with respect to the PBC reference.
+             * Thus x_i - x_pull = radialLocation_i + (a_i - axialPullGroupLocation)*vec.
+             */
+            const DVec&  vec = spatialData.vec;
+            const double axialPullGroupLocation =
+                    vec.dot(pull->group[pcrd.params_.group[1]].x - pbcReference);
+            const double cylDev = spatialData.cyl_dev;
+            for (int m = 0; m < DIM; m++)
+            {
+                for (int n = 0; n < DIM; n++)
+                {
+                    /* The axial force acting on the radial and axial locations */
+                    double sum = buffer[12 + m] * vec[n]
+                                 + wmass * (axialComLocation - axialPullGroupLocation) * vec[m] * vec[n];
+                    /* The radial force acting on the radial location */
+                    sum += buffer[24 + m * DIM + n] + cylDev * buffer[15 + m * DIM + n];
+                    /* The radial force acting on the axial location */
+                    sum += vec[m]
+                           * (buffer[9 + n] + (cylDev - axialPullGroupLocation) * buffer[6 + n]
+                              - axialPullGroupLocation * cylDev * buffer[3 + n]);
+                    spatialData.cylinderVirialFactor[m][n] = -sum / wmass;
+                }
             }
         }
 

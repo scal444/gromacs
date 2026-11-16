@@ -1169,7 +1169,27 @@ static void add_virial_coord_dr(tensor vir, const DVec& dr, const DVec& f)
 /* Adds the pull contribution to the virial */
 static void add_virial_coord(tensor vir, const pull_coord_work_t& pcrd, const PullCoordVectorForces& forces)
 {
-    if (vir != nullptr && pcrd.params_.eGeom != PullGroupGeometry::DirectionPBC)
+    if (vir == nullptr || pcrd.params_.eGeom == PullGroupGeometry::DirectionPBC)
+    {
+        return;
+    }
+
+    if (pcrd.params_.eGeom == PullGroupGeometry::Cylinder)
+    {
+        /* The weights of the atoms in the cylinder group depend on the radial
+         * distance to the pull group. This leads to radial forces and a radial
+         * offset of the COM of the cylinder group, which are taken into account
+         * in the precomputed virial factor.
+         */
+        for (int j = 0; j < DIM; j++)
+        {
+            for (int m = 0; m < DIM; m++)
+            {
+                vir[j][m] -= 0.5 * pcrd.scalarForce * pcrd.spatialData.cylinderVirialFactor[j][m];
+            }
+        }
+    }
+    else
     {
         /* Add the pull contribution for each distance vector to the virial.
          * The forces only have components along the dimensions selected

@@ -47,6 +47,7 @@
 
 #include "config.h"
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -159,10 +160,12 @@ struct PullCoordSpatialData
     gmx::DVec dr01AllDims = { 0.0, 0.0, 0.0 };
     gmx::DVec dr23AllDims = { 0.0, 0.0, 0.0 };
     gmx::DVec dr45AllDims = { 0.0, 0.0, 0.0 };
-    gmx::DVec vec;        /* The pull direction */
-    double    vec_len;    /* Length of vec for direction-relative */
-    gmx::DVec ffrad;      /* conversion factor from vec to radial force */
-    double    cyl_dev;    /* The deviation from the reference position */
+    gmx::DVec vec;     /* The pull direction */
+    double    vec_len; /* Length of vec for direction-relative */
+    gmx::DVec ffrad;   /* conversion factor from vec to radial force */
+    double    cyl_dev; /* The deviation from the reference position */
+    /* The virial for geometry cylinder is -0.5 times the scalar force times this tensor */
+    std::array<gmx::DVec, DIM> cylinderVirialFactor = {};
     gmx::DVec planevec_m; /* Normal of plane for groups 0, 1, 2, 3 for geometry dihedral */
     gmx::DVec planevec_n; /* Normal of plane for groups 2, 3, 4, 5 for geometry dihedral */
 
@@ -248,8 +251,12 @@ struct ComSums
 /*! \brief The normal COM buffer needs 3 elements per group */
 static constexpr int c_comBufferStride = 3;
 
-/*! \brief The cylinder buffer needs 9 elements per group */
-static constexpr int c_cylinderBufferStride = 9;
+/*! \brief The cylinder buffer needs 33 elements per pull coordinate
+ *
+ * Three scalars, two vectors for the radial forces
+ * and two vectors and two tensors for the virial.
+ */
+static constexpr int c_cylinderBufferStride = 3 + 2 * DIM + 2 * DIM + 2 * DIM * DIM;
 
 struct pull_comm_t
 {

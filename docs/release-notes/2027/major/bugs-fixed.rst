@@ -218,3 +218,14 @@ elements were missing when pulling was not applied in all dimensions.
 This affected the off-diagonal elements of the pressure tensor. The
 diagonal elements, and thus simulations with isotropic or semi-isotropic
 pressure coupling or a rectangular box, were not affected.
+
+Correct the virial with cylinder pulling
+""""""""""""""""""""""""""""""""""""""""
+
+With :mdp-value:`pull-coord1-geometry=cylinder`, only the force along
+the pull vector acting between the pull group and the axial location
+of the center of mass of the cylinder group was included in the virial.
+The contributions of the radial forces and of the radial offset
+of the cylinder group were missing. With a cylinder along z, this
+affected all elements of the virial, and thus the pressure,
+except for the zz element.
