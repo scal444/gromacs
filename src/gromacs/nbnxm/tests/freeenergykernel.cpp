@@ -428,7 +428,9 @@ protected:
     real               softcoreAlpha_;
     bool               softcoreCoulomb_;
     SoftcoreType       softcoreType_;
-    TestReferenceData  refData_;
+    //! Whether the last kernel call used LJ-PME
+    bool              usesLJPme_ = false;
+    TestReferenceData refData_;
     //! Created on first use, so tests that do not compare with reference data need no file
     std::optional<TestReferenceChecker> checker_;
 
@@ -461,10 +463,15 @@ protected:
 
     /*! \brief Runs the kernel and returns its output
      *
-     * \param[in] x        Coordinates
-     * \param[in] lambdas  Lambda value for each perturbation component
+     * \param[in] x                    Coordinates
+     * \param[in] lambdas              Lambda value for each perturbation component
+     * \param[in] useSimd              Whether to use the SIMD kernel, when available
+     * \param[in] forceSwitchIfCutoff  Whether to change plain cut-off LJ to force-switched LJ
      */
-    OutputQuantities runKernel(const PaddedVector<RVec>& x, ArrayRef<const real> lambdas)
+    OutputQuantities runKernel(const PaddedVector<RVec>& x,
+                               ArrayRef<const real>      lambdas,
+                               const bool                useSimd             = GMX_USE_SIMD_KERNELS,
+                               const bool                forceSwitchIfCutoff = false)
     {
         input_.frHelper.setSoftcoreAlpha(softcoreAlpha_);
         input_.frHelper.setSoftcoreCoulomb(softcoreCoulomb_);
@@ -474,6 +481,18 @@ protected:
         t_forcerec fr{ HostAllocationPolicy{} };
 
         input_.frHelper.getForcerec(&fr);
+        fr.use_simd_kernels = useSimd;
+        usesLJPme_          = (fr.ic->vdw.type == VanDerWaalsType::Pme);
+        if (forceSwitchIfCutoff && fr.ic->vdw.type == VanDerWaalsType::Cut
+            && fr.ic->vdw.modifier == InteractionModifiers::None)
+        {
+            // The shift constants do not need to result in zero force at the cut-off
+            // for the forces to be consistent with the energies.
+            fr.ic->vdw.modifier        = InteractionModifiers::ForceSwitch;
+            fr.ic->vdw.switchDistance  = 0.1;
+            fr.ic->vdw.dispersionShift = { -30, 20, -1 };
+            fr.ic->vdw.repulsionShift  = { -50, 40, -1 };
+        }
 
         // AtomPairlist
         AtomPairlist nbl = input_.atoms.getNbList();
@@ -526,37 +545,63 @@ protected:
         checkOutput(&checker(), output);
     }
 
-    //! Checks that forces and dV/dlambda are derivatives of the energy
-    void testDerivativesMatchEnergy()
+    /*! \brief Checks that forces and dV/dlambda are derivatives of the energy
+     *
+     * \param[in] useSimd              Whether to use the SIMD kernel, when available
+     * \param[in] useDifferentLambdas  Whether to use different lambdas for Coulomb and Van der
+     * Waals \param[in] forceSwitchIfCutoff  Whether to change plain cut-off LJ to force-switched LJ
+     */
+    void testDerivativesMatchEnergy(const bool useSimd, const bool useDifferentLambdas, const bool forceSwitchIfCutoff)
     {
+        SCOPED_TRACE(formatString("Testing with%s SIMD, %s lambdas%s",
+                                  useSimd ? "" : "out",
+                                  useDifferentLambdas ? "different" : "equal",
+                                  forceSwitchIfCutoff ? ", force switch" : ""));
+
         const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
-        const std::vector<real> lambdas(numFepCouplingTerms, lambda_);
+        std::vector<real> lambdas(numFepCouplingTerms, lambda_);
+        if (useDifferentLambdas)
+        {
+            lambdas[static_cast<int>(FreeEnergyPerturbationCouplingType::Vdw)] =
+                    0.6_real * lambda_ + 0.3_real;
+        }
 
         auto energy = [&](ArrayRef<const RVec> xTrial, ArrayRef<const real> lambdasTrial) -> double
         {
             PaddedVector<RVec> xPadded(xTrial.size());
             std::copy(xTrial.begin(), xTrial.end(), xPadded.begin());
-            const OutputQuantities trialOutput = runKernel(xPadded, lambdasTrial);
+            const OutputQuantities trialOutput =
+                    runKernel(xPadded, lambdasTrial, useSimd, forceSwitchIfCutoff);
             return trialOutput.energy.energyGroupPairTerms[NonBondedEnergyTerms::CoulombSR][0]
                    + trialOutput.energy.energyGroupPairTerms[NonBondedEnergyTerms::LJSR][0];
         };
 
-        const OutputQuantities output = runKernel(x_, lambdas);
+        const OutputQuantities output = runKernel(x_, lambdas, useSimd, forceSwitchIfCutoff);
 
+        FiniteDifferenceSettings settings;
+        if (usesLJPme_)
+        {
+            // At very short distances the kernel uses a series expansion for the LJ-PME
+            // grid correction that is accurate for the total force, but for which
+            // the force is not the exact derivative of the potential.
+            settings.relativeTolerance = 1e-5;
+        }
         checkForcesMatchEnergy(
-                x_, output.f, [&](ArrayRef<const RVec> xTrial) { return energy(xTrial, lambdas); });
+                x_, output.f, [&](ArrayRef<const RVec> xTrial) { return energy(xTrial, lambdas); }, settings);
 
         for (const auto couplingType :
              { FreeEnergyPerturbationCouplingType::Coul, FreeEnergyPerturbationCouplingType::Vdw })
         {
             SCOPED_TRACE(formatString("Testing lambda component %s", enumValueToString(couplingType)));
-            checkDvdlambdaMatchesEnergy(output.dvdLambda[static_cast<int>(couplingType)],
-                                        [&](const double lambdaChange)
-                                        {
-                                            std::vector<real> lambdasTrial = lambdas;
-                                            lambdasTrial[static_cast<int>(couplingType)] += lambdaChange;
-                                            return energy(x_, lambdasTrial);
-                                        });
+            checkDvdlambdaMatchesEnergy(
+                    output.dvdLambda[static_cast<int>(couplingType)],
+                    [&](const double lambdaChange)
+                    {
+                        std::vector<real> lambdasTrial = lambdas;
+                        lambdasTrial[static_cast<int>(couplingType)] += lambdaChange;
+                        return energy(x_, lambdasTrial);
+                    },
+                    settings);
         }
     }
 };
@@ -573,7 +618,20 @@ TEST_P(NonbondedFepTest, DerivativesMatchEnergy)
         GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
                         "precision";
     }
-    testDerivativesMatchEnergy();
+    for (const bool useSimd : { false, true })
+    {
+        if (useSimd && !GMX_USE_SIMD_KERNELS)
+        {
+            continue;
+        }
+        for (const bool useDifferentLambdas : { false, true })
+        {
+            for (const bool forceSwitchIfCutoff : { false, true })
+            {
+                testDerivativesMatchEnergy(useSimd, useDifferentLambdas, forceSwitchIfCutoff);
+            }
+        }
+    }
 }
 
 //! configurations to test
