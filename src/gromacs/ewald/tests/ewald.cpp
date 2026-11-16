@@ -34,7 +34,7 @@
 /*! \internal \file
  * \brief
  * Tests that forces, virial and dV/dlambda of the plain Ewald reciprocal
- * sum are consistent with the energy
+ * sum and the net-charge correction are consistent with the energy
  *
  * \author Kevin Boyd <kevin44boyd@gmail.com>
  * \ingroup module_ewald
@@ -326,6 +326,70 @@ INSTANTIATE_TEST_SUITE_P(Perturbed,
                                             ::testing::Bool(),
                                             ::testing::Values(0.0, 0.4, 1.0)),
                          nameOfTest);
+
+//! Test fixture for the Ewald correction for systems with net charge, parametrized on lambda
+class EwaldChargeCorrectionTest : public ::testing::TestWithParam<real>
+{
+public:
+    //! Output of the correction
+    struct Output
+    {
+        //! The energy
+        real energy = 0;
+        //! The derivative of the energy with respect to lambda
+        real dvdlambda = 0;
+        //! The virial
+        matrix virial = { { 0 } };
+    };
+
+    //! Computes the correction for \c box and \c lambda
+    static Output computeCorrection(const matrix box, const real lambda)
+    {
+        // The net charge in states A and B
+        const std::array<double, 2> chargeSum = { 3.0, -2.0 };
+
+        Output output;
+        output.energy = ewald_charge_correction(
+                nullptr, c_epsilonR, c_ewaldCoefficient, chargeSum, lambda, box, &output.dvdlambda, output.virial);
+
+        return output;
+    }
+};
+
+TEST_P(EwaldChargeCorrectionTest, DerivativesMatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+
+    const real lambda = GetParam();
+
+    matrix box  = { { 0 } };
+    box[XX][XX] = 2.0;
+    box[YY][XX] = 0.4;
+    box[YY][YY] = 2.5;
+    box[ZZ][XX] = -0.3;
+    box[ZZ][YY] = 0.5;
+    box[ZZ][ZZ] = 3.0;
+
+    const Output output = computeCorrection(box, lambda);
+
+    checkDvdlambdaMatchesEnergy(output.dvdlambda,
+                                [&](const double lambdaChange)
+                                { return computeCorrection(box, lambda + lambdaChange).energy; });
+
+    // The correction does not depend on the coordinates
+    const std::vector<RVec> x;
+    checkVirialTensorMatchesEnergy(x,
+                                   box,
+                                   output.virial,
+                                   [&](ArrayRef<const RVec> /* x */, const matrix boxTrial)
+                                   { return computeCorrection(boxTrial, lambda).energy; });
+}
+
+INSTANTIATE_TEST_SUITE_P(Lambda, EwaldChargeCorrectionTest, ::testing::Values(0.0, 0.4, 1.0));
 
 } // namespace
 } // namespace test

@@ -337,9 +337,12 @@ real ewald_charge_correction(const gmx_domdec_t*         dd,
 
         *dvdlambda += -vol * (qs2B - qs2A) * fac;
 
+        // The energy is inversely proportional to the volume, so the derivative
+        // with respect to strain along each dimension is minus the energy.
+        // The virial is half of that.
         for (int d = 0; d < DIM; d++)
         {
-            vir[d][d] += vc;
+            vir[d][d] += -0.5_real * enercorr;
         }
     }
 

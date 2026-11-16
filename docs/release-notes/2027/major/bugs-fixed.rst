@@ -141,3 +141,14 @@ The virial contribution of the Ewald dipole corrections used with
 :mdp:`epsilon-surface` or :mdp:`ewald-geometry` set to ``3dc``
 lacked the off-diagonal elements, which affected the off-diagonal
 elements of the pressure tensor.
+Correct the virial of the Ewald correction for systems with net charge
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With Ewald or PME electrostatics and a system with net charge, the
+virial contribution of the energy correction for the net charge was
+divided by the box volume instead of multiplied by a half. The pressure
+contribution of this term was therefore too small by a factor of half
+the box volume in cubic nanometers. The error in the pressure is
+proportional to the square of the net charge divided by the square of
+the volume, so it mainly affected small systems with a large net charge.
+The energy and forces were correct.
