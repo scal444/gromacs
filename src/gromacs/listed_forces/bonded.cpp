@@ -1924,7 +1924,7 @@ real dopdihs_min(real cpA, real cpB, real phiA, real phiB, int mult, real phi, r
     v1    = 1.0 - std::cos(mdphi);
     v     = cp * v1;
 
-    dvdlambda = (cpB - cpA) * v1 + cp * dph0 * sdphi;
+    dvdlambda = (cpB - cpA) * v1 - cp * mult * dph0 * sdphi;
 
     *V = v;
     *F = ddphi;

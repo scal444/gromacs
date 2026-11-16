@@ -71,3 +71,10 @@ Correct dV/dlambda for perturbed linear angles
 
 The contribution to dV/dlambda from perturbing the parameter a of the
 linear-angle potential had the wrong sign. Forces and energies were correct.
+
+Correct dV/dlambda for perturbed angle restraints
+"""""""""""""""""""""""""""""""""""""""""""""""""
+
+The contribution to dV/dlambda from perturbing the reference angle of
+angle restraints, with or without z-axis, had the wrong sign and lacked
+a factor of the multiplicity. Forces and energies were correct.

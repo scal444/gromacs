@@ -3,7 +3,7 @@
 <ReferenceData>
   <FunctionType Name="ANGRES">
     <Real Name="Epot ">39.04767735234671</Real>
-    <Real Name="dVdlambda ">21.652453207614126</Real>
+    <Real Name="dVdlambda ">15.266609613291813</Real>
     <Sequence Name="Forces">
       <Int Name="Length">4</Int>
       <Vector>
