@@ -35,6 +35,7 @@ gmx_add_unit_test(ListedForcesTest listed_forces-test HARDWARE_DETECTION
     CPP_SOURCE_FILES
         bondedtestdata.cpp
         cmap_fep.cpp
+        disre.cpp
         pairs.cpp
         perturbed_interactions.cpp
         position_restraints.cpp
