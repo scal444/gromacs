@@ -198,3 +198,11 @@ groups that define the pull direction. In practice these values were often
 zero, but when a pull coordinate with geometry angle or dihedral with
 a higher index was present, the forces of that coordinate were applied
 a second time to the groups defining the direction.
+
+Correct the virial with direction-relative pulling
+""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp-value:`pull-coord1-geometry=direction-relative`, the forces
+on the two pull groups that define the pull direction were not included
+in the virial. This led to an incorrect pressure, although the trace
+of the pressure tensor was not affected.

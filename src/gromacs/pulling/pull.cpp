@@ -293,41 +293,6 @@ static void apply_forces_cyl_grp(const pull_group_work_t& pgrp,
     }
 }
 
-/* Apply torque forces in a mass weighted fashion to the groups that define
- * the pull vector direction for pull coordinate pcrd.
- */
-static void apply_forces_vec_torque(const pull_coord_work_t&          pcrd,
-                                    ArrayRef<const pull_group_work_t> pullGroups,
-                                    ArrayRef<const real>              masses,
-                                    ArrayRef<RVec>                    f)
-{
-    const PullCoordSpatialData& spatialData = pcrd.spatialData;
-
-    /* The component inpr along the pull vector is accounted for in the usual
-     * way. Here we account for the component perpendicular to vec.
-     */
-    double inpr = 0;
-    for (int m = 0; m < DIM; m++)
-    {
-        inpr += spatialData.dr01[m] * spatialData.vec[m];
-    }
-    /* The torque force works along the component of the distance vector
-     * of between the two "usual" pull groups that is perpendicular to
-     * the pull vector. The magnitude of this force is the "usual" scale force
-     * multiplied with the ratio of the distance between the two "usual" pull
-     * groups and the distance between the two groups that define the vector.
-     */
-    DVec f_perp;
-    for (int m = 0; m < DIM; m++)
-    {
-        f_perp[m] = (spatialData.dr01[m] - inpr * spatialData.vec[m]) / spatialData.vec_len * pcrd.scalarForce;
-    }
-
-    /* Apply the force to the groups defining the vector using opposite signs */
-    apply_forces_grp(pullGroups[pcrd.params_.group[2]], masses, f_perp, -1, f);
-    apply_forces_grp(pullGroups[pcrd.params_.group[3]], masses, f_perp, 1, f);
-}
-
 /* Apply forces in a mass weighted fashion */
 static void apply_forces_coord(const pull_coord_work_t&          pcrd,
                                ArrayRef<const pull_group_work_t> pullGroups,
@@ -359,14 +324,6 @@ static void apply_forces_coord(const pull_coord_work_t&          pcrd,
     }
     else
     {
-        if (pcrd.params_.eGeom == PullGroupGeometry::DirectionRelative)
-        {
-            /* We need to apply the torque forces to the pull groups
-             * that define the pull vector.
-             */
-            apply_forces_vec_torque(pcrd, pullGroups, masses, f);
-        }
-
         if (!pullGroups[pcrd.params_.group[0]].params_.ind.empty())
         {
             apply_forces_grp(pullGroups[pcrd.params_.group[0]], masses, forces.force01, -1, f);
@@ -1399,6 +1356,21 @@ static PullCoordVectorForces calculateVectorForces(const pull_coord_work_t& pcrd
         for (int m = 0; m < DIM; m++)
         {
             forces.force01[m] = pcrd.scalarForce * spatialData.vec[m];
+        }
+
+        if (params.eGeom == PullGroupGeometry::DirectionRelative)
+        {
+            /* The pull vector is the normalized distance vector between
+             * groups 2 and 3, so the pull force exerts a torque on that vector.
+             * The force on group 3, and minus that on group 2, is along
+             * the component of the distance vector between groups 0 and 1
+             * that is perpendicular to the pull vector. The magnitude of this
+             * force is the scalar force multiplied with the ratio of this
+             * perpendicular distance and the distance between groups 2 and 3.
+             */
+            const double inpr = spatialData.dr01.dot(spatialData.vec);
+            forces.force23    = (pcrd.scalarForce / spatialData.vec_len)
+                             * (spatialData.dr01 - inpr * spatialData.vec);
         }
     }
 
