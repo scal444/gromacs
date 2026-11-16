@@ -45,6 +45,7 @@ gmx_add_unit_test(EwaldUnitTests ewald-test
     DYNAMIC_REGISTRATION
     CPP_SOURCE_FILES
         pmebsplinetest.cpp
+        pmederivativestest.cpp
         pmegathertest.cpp
         pmesolvetest.cpp
         pmesplinespreadtest.cpp
