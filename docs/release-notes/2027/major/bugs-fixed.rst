@@ -254,3 +254,13 @@ or charge. Energies were correct. Note that, to obtain the same forces
 as before with unit amplitudes and normalization,
 :mdp:`density-guided-simulation-force-constant` needs to be divided by
 the number of atoms in the fitting group.
+
+Correct density-guided simulations with two domains
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With exactly two particle-particle MPI ranks, the simulated density was
+not summed over the ranks, so each rank computed the similarity and the
+forces from the density of its own atoms only. This led to incorrect
+density-guided simulation forces and energies when atoms of the fitting
+group were present on both ranks. Runs with one rank or with more than
+two ranks were not affected.

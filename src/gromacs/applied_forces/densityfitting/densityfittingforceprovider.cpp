@@ -337,7 +337,7 @@ void DensityFittingForceProvider::Impl::calculateForces(const ForceProviderInput
     }
 
     // communicate grid
-    if (forceProviderInput.mpiComm_.size() > 2)
+    if (forceProviderInput.mpiComm_.isParallel())
     {
         // \todo update to real once GaussTransform class returns real
         forceProviderInput.mpiComm_.sumReduce(gaussTransform_.view().mapping().required_span_size(),
