@@ -1296,7 +1296,8 @@ real linear_angles(int             nbonds,
             f[ak][m] += f_k[m];
         }
         va = 0.5 * klin * dr2;
-        *dvdlambda += 0.5 * (kB - kA) * dr2 + klin * (aB - aA) * iprod(dx, r_ik);
+        // Note that d(dx)/dlambda = -(aB - aA) * r_ik
+        *dvdlambda += 0.5 * (kB - kA) * dr2 - klin * (aB - aA) * iprod(dx, r_ik);
 
         vtot += va;
 

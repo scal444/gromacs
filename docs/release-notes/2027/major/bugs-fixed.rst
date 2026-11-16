@@ -65,3 +65,9 @@ The derivative of the potential energy with respect to lambda for
 perturbed GROMOS-96 (quartic) bonds was a factor of two too large. Forces and
 energies were correct. Free-energy differences computed from dH/dlambda
 or its derived quantities with such bonds perturbed were affected.
+
+Correct dV/dlambda for perturbed linear angles
+""""""""""""""""""""""""""""""""""""""""""""""
+
+The contribution to dV/dlambda from perturbing the parameter a of the
+linear-angle potential had the wrong sign. Forces and energies were correct.

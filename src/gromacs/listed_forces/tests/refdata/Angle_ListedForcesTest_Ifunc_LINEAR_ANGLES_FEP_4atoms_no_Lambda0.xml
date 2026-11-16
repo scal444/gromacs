@@ -3,7 +3,7 @@
 <ReferenceData>
   <FunctionType Name="LINEAR_ANGLES">
     <Real Name="Epot ">0.40544900000000034</Real>
-    <Real Name="dVdlambda ">0.0461061999999995</Real>
+    <Real Name="dVdlambda ">-0.20828579999999963</Real>
     <Sequence Name="Forces">
       <Int Name="Length">4</Int>
       <Vector>
