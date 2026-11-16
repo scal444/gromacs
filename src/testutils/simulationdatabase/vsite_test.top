@@ -142,6 +142,11 @@ VSTEST     3
    13   14   15   16    1      0.00     5.92    3
 [ exclusions ]
 ;  ai   aj  funct  ;  GROMOS 1-4 exclusions
+#ifdef EXCLUDE_COINCIDING_SITE
+; Virtual site 17 is constructed on top of atom 1. Without excluding
+; this pair the non-bonded energy is not defined.
+   17    1
+#endif
 [ virtual_sites1 ]
 ; Site  from        funct
   17    1           1
