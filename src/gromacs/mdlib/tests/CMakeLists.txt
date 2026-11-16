@@ -37,6 +37,7 @@ gmx_add_unit_test(MdlibUnitTest mdlib-test HARDWARE_DETECTION
         calcvir.cpp
         constraintgroupsize.cpp
         constrtestdata.cpp
+        dispersioncorrection.cpp
         ebin.cpp
         energydrifttracker.cpp
         energyoutput.cpp
