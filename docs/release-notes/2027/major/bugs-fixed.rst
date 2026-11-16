@@ -84,3 +84,13 @@ which arise from the radial dependence of the weights of the atoms
 in the cylinder group, were incorrect when the pull vector was not
 along the positive x, y or z direction, e.g. with a vector of ``0 0 -1``.
 The pull energy and the forces along the pull vector were correct.
+
+Avoid incorrect forces with direction-relative pulling
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp-value:`pull-coord1-geometry=direction-relative`, uninitialized
+values were added to the forces on, and to the virial of, the two pull
+groups that define the pull direction. In practice these values were often
+zero, but when a pull coordinate with geometry angle or dihedral with
+a higher index was present, the forces of that coordinate were applied
+a second time to the groups defining the direction.
