@@ -1377,6 +1377,10 @@ real calcVerletBufferSize(const gmx_mtop_t&         mtop,
         GMX_RELEASE_ASSERT(ensembleTemperature >= 0, "Without T-coupling we should not end up here");
     }
 
+    // A non-finite temperature would make the bisection bounds below meaningless
+    GMX_RELEASE_ASSERT(std::isfinite(ensembleTemperature),
+                       "Need a finite temperature to determine the Verlet buffer size");
+
     const bool limitPressureError = (pressureTolerance > 0);
 
     /* Resolution of the buffer size */

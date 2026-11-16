@@ -139,6 +139,77 @@ TEST_P(GromppSpecialParticlesVelocitiesTest, ZeroWhenExpected)
 
 INSTANTIATE_TEST_SUITE_P(Works, GromppSpecialParticlesVelocitiesTest, testing::Bool());
 
+/* A system without degrees of freedom has an undefined temperature. With NVE
+ * dynamics this should result in the fixed Verlet buffer for zero temperature
+ * and not in a buffer estimate based on a NaN or infinite temperature.
+ */
+class GromppVerletBufferWithoutDegreesOfFreedomTest : public ::testing::TestWithParam<bool>
+{
+};
+
+TEST_P(GromppVerletBufferWithoutDegreesOfFreedomTest, UsesZeroTemperatureBuffer)
+{
+    const bool haveNonZeroVelocity = GetParam();
+
+    TestFileManager fileManager;
+
+    // A single atom with COM motion removal has zero degrees of freedom
+    const std::string           name             = "single-atom";
+    const std::filesystem::path mdpInputFileName = fileManager.getTemporaryFilePath(name + ".mdp");
+    TextWriter::writeFileFromString(mdpInputFileName,
+                                    "integrator = md\n"
+                                    "tcoupl = no\n"
+                                    "continuation = yes\n"
+                                    "rvdw = 1\n"
+                                    "rcoulomb = 1\n");
+    const std::filesystem::path topFileName = fileManager.getTemporaryFilePath(name + ".top");
+    TextWriter::writeFileFromString(topFileName,
+                                    "[ defaults ]\n"
+                                    "1 1 no 1.0 1.0\n"
+                                    "[ atomtypes ]\n"
+                                    "AR 39.948 0.0 A 0.34 1.0\n"
+                                    "[ moleculetype ]\n"
+                                    "AR 1\n"
+                                    "[ atoms ]\n"
+                                    "1 AR 1 AR AR 1 0.0 39.948\n"
+                                    "[ system ]\n"
+                                    "single atom\n"
+                                    "[ molecules ]\n"
+                                    "AR 1\n");
+    const std::filesystem::path groFileName = fileManager.getTemporaryFilePath(name + ".gro");
+    TextWriter::writeFileFromString(
+            groFileName,
+            formatString("single atom\n"
+                         "    1\n"
+                         "    1AR      AR    1   1.000   1.200   1.400  %6.4f  0.0000  0.0000\n"
+                         "   3.00000   3.00000   3.00000\n",
+                         haveNonZeroVelocity ? 0.5 : 0.0));
+    const std::filesystem::path tprFileName = fileManager.getTemporaryFilePath(name + ".tpr");
+    {
+        SCOPED_TRACE("Calling grompp");
+        CommandLine caller;
+        caller.append("grompp");
+        caller.addOption("-f", mdpInputFileName);
+        caller.addOption("-p", topFileName);
+        caller.addOption("-c", groFileName);
+        caller.addOption("-o", tprFileName);
+        EXPECT_EQ(0, gmx_grompp(caller.argc(), caller.argv()));
+    }
+
+    {
+        SCOPED_TRACE("Checking the pair-list cut-off");
+        gmx_mtop_t topAfter;
+        t_inputrec irAfter;
+        t_state    stateAfter;
+        read_tpx_state(tprFileName, &irAfter, &stateAfter, &topAfter);
+
+        // With a temperature of zero, grompp uses a buffer of 10% of the cut-off
+        EXPECT_REAL_EQ(irAfter.rlist, 1.1_real);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(Works, GromppVerletBufferWithoutDegreesOfFreedomTest, testing::Bool());
+
 //! Test fixture for grompp with frozen particles, parametrized by the integrator
 class GromppFrozenParticlesTest : public ::testing::TestWithParam<IntegrationAlgorithm>
 {

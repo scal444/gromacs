@@ -1595,6 +1595,14 @@ real calc_temp(const gmx_mtop_t* mtop, const t_inputrec* ir, rvec* v)
         nrdf += ir->opts.nrdf[g];
     }
 
+    if (nrdf <= 0)
+    {
+        // Without degrees of freedom, e.g. for a single atom with COM motion removal
+        // or with all atoms frozen, there is no thermal motion. Avoid dividing by zero,
+        // which would return a NaN or infinite temperature.
+        return 0;
+    }
+
     return sum_mv2 / (nrdf * c_boltz);
 }
 

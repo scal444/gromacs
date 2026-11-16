@@ -57,3 +57,13 @@ Below are issues fixed in the (`Colvars <https://colvars.github.io>`_) library (
 
 - Improved restart consistency and fixes for multi-replica well-tempered metadynamics (Colvars repo pull request `820 <https://github.com/Colvars/colvars/pull/820>`_)
 - Fixed wrapping of extended-system variable coupled to orientationAngle (Colvars repo pull request `943 <https://github.com/Colvars/colvars/pull/943>`_)
+
+grompp no longer fails for NVE systems without degrees of freedom
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Without temperature coupling, :ref:`gmx grompp` determines the Verlet buffer
+from the temperature of the initial velocities. For systems without degrees
+of freedom, e.g. a single atom with center of mass motion removal or a system
+with all atoms frozen, this temperature was NaN or infinite, which resulted
+in a fatal error about a pair-list cut-off of minus two million nm. Now the
+fixed buffer for a temperature of zero is used for such systems.
