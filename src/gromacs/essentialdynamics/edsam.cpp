@@ -870,12 +870,18 @@ void flood_blowup(const t_edpar& edi, rvec* forces_cart)
     /* Now compute atomwise */
     for (int j = 0; j < edi.sav.nr_loc; j++)
     {
+        const int collectiveIndex = edi.sav.c_ind[j];
+        /* The projection on eigenvector i is sum_j sqrtm_j vec_i,j . x_j,
+         * see projectx(), so its derivative with respect to x_j, and thereby
+         * the force, has a factor sqrtm_j, which is the square root
+         * of the mass with mass-weighted analysis and otherwise 1. */
+        const real sqrtMass = edi.sav.sqrtm[collectiveIndex];
         /* Compute forces_cart[edi.sav.anrs[j]] */
         for (int eig = 0; eig < edi.flood.vecs.neig; eig++)
         {
             rvec addedForce;
             /* Force vector is force * eigenvector (compute only atom j) */
-            svmul(forces_sub[eig], edi.flood.vecs.vec[eig][edi.sav.c_ind[j]], addedForce);
+            svmul(forces_sub[eig] * sqrtMass, edi.flood.vecs.vec[eig][collectiveIndex], addedForce);
             /* Add this vector to the cartesian forces */
             rvec_inc(forces_cart[j], addedForce);
         }

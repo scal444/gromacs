@@ -66,5 +66,5 @@ target_link_libraries(essentialdynamics INTERFACE
 set(LIBGROMACS_SOURCES ${LIBGROMACS_SOURCES} ${ESSENTIALDYNAMICS_SOURCES} PARENT_SCOPE)
 
 if (BUILD_TESTING)
-#    add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()

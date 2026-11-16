@@ -264,3 +264,14 @@ forces from the density of its own atoms only. This led to incorrect
 density-guided simulation forces and energies when atoms of the fitting
 group were present on both ranks. Runs with one rank or with more than
 two ranks were not affected.
+
+Correct essential dynamics flooding forces with mass-weighted eigenvectors
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With eigenvectors from a mass-weighted covariance analysis, the flooding
+potential is a function of mass-weighted projections on the eigenvectors,
+but the flooding force on each atom lacked the corresponding factor of
+the square root of the mass of the atom. The forces were thus not
+consistent with the flooding energy, also for harmonic restraints and
+constant-force flooding. Flooding with eigenvectors from an analysis
+without mass weighting was not affected.
