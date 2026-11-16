@@ -75,3 +75,12 @@ The effective mass of a pull group with cosine weighting
 (``pull-group?-pbcatom = -1``) was underestimated by up to 25%,
 depending on the location of the group in the box.
 This affected the constraint force with constraint pulling.
+
+Correct radial pull forces with cylinder geometry and a pull vector not along a positive axis
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp-value:`pull-coord1-geometry=cylinder` the radial forces,
+which arise from the radial dependence of the weights of the atoms
+in the cylinder group, were incorrect when the pull vector was not
+along the positive x, y or z direction, e.g. with a vector of ``0 0 -1``.
+The pull energy and the forces along the pull vector were correct.

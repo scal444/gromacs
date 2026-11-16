@@ -342,14 +342,14 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
              * used above, since we need it when we apply the radial forces
              * to the atoms in the cylinder group.
              */
-            spatialData.cyl_dev     = 0;
-            const DVec pbcReference = getCylinderRefGroupPbcReference(pcrd, pull->group);
-            for (int m = 0; m < DIM; m++)
-            {
-                double dist        = -spatialData.vec[m] * buffer[2] * dynamicGroup0.mwscale;
-                dynamicGroup0.x[m] = pbcReference[m] - dist;
-                spatialData.cyl_dev += dist;
-            }
+            const double axialComLocation = buffer[2] * dynamicGroup0.mwscale;
+            const DVec   pbcReference     = getCylinderRefGroupPbcReference(pcrd, pull->group);
+            dynamicGroup0.x               = pbcReference + axialComLocation * spatialData.vec;
+            /* Note that this is a distance along the cylinder axis and not
+             * the sum of the Cartesian components of the displacement,
+             * those only coincide for an axis along +x, +y or +z.
+             */
+            spatialData.cyl_dev = -axialComLocation;
             /* Now we know the exact COM of the cylinder reference group,
              * we can determine the radial force factor (ffrad) that when
              * multiplied with the axial pull force will give the radial
