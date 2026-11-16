@@ -285,3 +285,15 @@ with the number of voxels along x and z interchanged. With reference densities
 with different extents along x and z, in boxes not much larger than the
 density, atoms could be placed in a periodic image outside the density, where
 they do not contribute to the similarity and experience no force.
+With :mdp:`epsilon-surface`, the virial contribution of the dipole
+correction was only added to the diagonal of the virial, so the
+off-diagonal elements of the pressure tensor lacked this contribution.
+
+Correct plain Ewald electrostatics with triclinic boxes
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp:`coulombtype` set to ``Ewald``, the reciprocal-space sum
+ignored the off-diagonal elements of the box. This silently gave incorrect
+energies, forces and virial with triclinic boxes, including the rhombic
+dodecahedron and truncated octahedron. Rectangular boxes and PME were not
+affected.

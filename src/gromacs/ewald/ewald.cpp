@@ -56,6 +56,7 @@
 
 #include "gromacs/domdec/domdec_struct.h"
 #include "gromacs/ewald/ewald_utils.h"
+#include "gromacs/math/boxmatrix.h"
 #include "gromacs/math/gmxcomplex.h"
 #include "gromacs/math/units.h"
 #include "gromacs/math/utilities.h"
@@ -89,16 +90,14 @@ gmx_ewald_tab_t::gmx_ewald_tab_t(const t_inputrec& ir, FILE* fp)
 
 gmx_ewald_tab_t::~gmx_ewald_tab_t() = default;
 
-//! Calculates wave vectors.
-static void calc_lll(const rvec box, rvec lll)
-{
-    lll[XX] = 2.0 * M_PI / box[XX];
-    lll[YY] = 2.0 * M_PI / box[YY];
-    lll[ZZ] = 2.0 * M_PI / box[ZZ];
-}
-
-//! Make tables for the structure factor parts
-static void tabulateStructureFactors(int natom, gmx::ArrayRef<const gmx::RVec> x, int kmax, cvec** eir, const rvec lll)
+/*! \brief Make tables for the structure factor parts
+ *
+ * The phase of the structure factor for a wave vector is the sum over
+ * the box dimensions of the wave vector index times 2 pi times
+ * the fractional coordinate, so the tables are made for powers of
+ * the complex exponential of 2 pi times the fractional coordinates.
+ */
+static void tabulateStructureFactors(int natom, gmx::ArrayRef<const gmx::RVec> x, int kmax, cvec** eir, const matrix recipBox)
 {
     int i, j, m;
 
@@ -116,8 +115,15 @@ static void tabulateStructureFactors(int natom, gmx::ArrayRef<const gmx::RVec> x
 
         for (m = 0; (m < 3); m++)
         {
-            eir[1][i][m].re = std::cos(x[i][m] * lll[m]);
-            eir[1][i][m].im = std::sin(x[i][m] * lll[m]);
+            // The reciprocal box is lower triangular
+            real fractionalCoordinate = 0;
+            for (int d = m; d < DIM; d++)
+            {
+                fractionalCoordinate += x[i][d] * recipBox[d][m];
+            }
+            const real phase = 2.0 * M_PI * fractionalCoordinate;
+            eir[1][i][m].re  = std::cos(phase);
+            eir[1][i][m].im  = std::sin(phase);
         }
         for (j = 2; (j < kmax); j++)
         {
@@ -148,7 +154,6 @@ real do_ewald(bool                           havePbcXY2Walls,
 {
     real   factor = -1.0 / (4 * ewaldcoeff * ewaldcoeff);
     real   energy_AB[2], energy;
-    rvec   lll;
     int    lowiy, lowiz, ix, iy, iz, n, q;
     real   tmp, cs, ss, ak, akv, mx, my, mz, m2, scale;
     cvec** eir;
@@ -167,14 +172,16 @@ real do_ewald(bool                           havePbcXY2Walls,
     EwaldBoxZScaler boxScaler(havePbcXY2Walls, wallEwaldZfac);
     boxScaler.scaleBox(box, scaledBox);
 
-    rvec boxDiag;
-    for (int i = 0; (i < DIM); i++)
-    {
-        boxDiag[i] = scaledBox[i][i];
-    }
+    /* The wave vectors are 2 pi times integer combinations of the reciprocal
+     * box vectors. With a triclinic box these are not parallel to the
+     * Cartesian axes.
+     */
+    matrix recipBox;
+    gmx::invertBoxMatrix(scaledBox, recipBox);
 
     /* 1/(Vol*e0) */
-    real scaleRecip = 4.0 * M_PI / (boxDiag[XX] * boxDiag[YY] * boxDiag[ZZ]) * gmx::c_one4PiEps0 / epsilonR;
+    real scaleRecip = 4.0 * M_PI / (scaledBox[XX][XX] * scaledBox[YY][YY] * scaledBox[ZZ][ZZ])
+                      * gmx::c_one4PiEps0 / epsilonR;
 
     snew(eir, et->kmax);
     for (n = 0; n < et->kmax; n++)
@@ -188,8 +195,7 @@ real do_ewald(bool                           havePbcXY2Walls,
 
     clear_mat(lrvir);
 
-    calc_lll(boxDiag, lll);
-    tabulateStructureFactors(natoms, coords, et->kmax, eir, lll);
+    tabulateStructureFactors(natoms, coords, et->kmax, eir, recipBox);
 
     gmx::ArrayRef<const real> charge;
     for (q = 0; q < (bFreeEnergy ? 2 : 1); q++)
@@ -214,10 +220,10 @@ real do_ewald(bool                           havePbcXY2Walls,
         energy_AB[q] = 0;
         for (ix = 0; ix < et->nx; ix++)
         {
-            mx = ix * lll[XX];
+            mx = 2.0 * M_PI * ix * recipBox[XX][XX];
             for (iy = lowiy; iy < et->ny; iy++)
             {
-                my = iy * lll[YY];
+                my = 2.0 * M_PI * (ix * recipBox[YY][XX] + iy * recipBox[YY][YY]);
                 if (iy >= 0)
                 {
                     for (n = 0; n < natoms; n++)
@@ -234,7 +240,8 @@ real do_ewald(bool                           havePbcXY2Walls,
                 }
                 for (iz = lowiz; iz < et->nz; iz++)
                 {
-                    mz  = iz * lll[ZZ];
+                    mz = 2.0 * M_PI
+                         * (ix * recipBox[ZZ][XX] + iy * recipBox[ZZ][YY] + iz * recipBox[ZZ][ZZ]);
                     m2  = mx * mx + my * my + mz * mz;
                     ak  = std::exp(m2 * factor) / m2;
                     akv = 2.0 * ak * (1.0 / m2 - factor);
