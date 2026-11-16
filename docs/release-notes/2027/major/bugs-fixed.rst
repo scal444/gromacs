@@ -162,3 +162,12 @@ systems with net charge used the volume of the simulation box. The
 correction, its contribution to dV/dlambda when the net charge is
 perturbed and its virial were thus a factor :mdp:`wall-ewald-zfac` too
 large. Forces were correct.
+Correct pull forces on groups with cosine weighting
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With COM pulling using a pull group with cosine weighting
+(``pull-group?-pbcatom = -1``), the forces on the atoms of that group
+were scaled by a factor that, depending on the location of the group in
+the box, was up to 25% smaller than one. The pull energy and the forces
+on other pull groups were correct, so the pull forces were not conservative
+and did not sum to zero.

@@ -780,9 +780,12 @@ void pull_calc_coms(const gmx::MpiComm&  mpiComm,
                 pgrp->mwscale = 1.0 / wmass;
                 pgrp->wscale  = wmass / wwmass;
                 pgrp->invtm   = wwmass / (wmass * wmass);
-                /* Set the weights for the local atoms */
-                csw *= pgrp->invtm;
-                snw *= pgrp->invtm;
+                /* Set the weights for the local atoms: the cosine of the phase
+                 * difference with the COM, which is the derivative of the COM
+                 * with respect to the atom coordinate times wmass/mass.
+                 */
+                csw *= pgrp->mwscale;
+                snw *= pgrp->mwscale;
                 for (size_t i = 0; i < pgrp->atomSet_.numAtomsLocal(); i++)
                 {
                     int ii                = pgrp->atomSet_.localIndex()[i];
