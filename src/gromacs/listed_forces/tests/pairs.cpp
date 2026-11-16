@@ -462,15 +462,21 @@ protected:
      *
      * The energy always comes from the plain-C flavor, the derivatives
      * from all flavors supported for the input. */
-    void testDerivativesMatchEnergy(const real lambda, const SoftcoreType softcoreType)
+    void testDerivativesMatchEnergy(const real lambda, const SoftcoreType softcoreType, const bool useDifferentLambdas)
     {
-        SCOPED_TRACE(formatString("Testing PBC type: %s, lambda %g, soft-core type %s",
+        SCOPED_TRACE(formatString("Testing PBC type: %s, lambda %g, soft-core type %s, %s lambdas",
                                   c_pbcTypeNames[pbcType_].c_str(),
                                   lambda,
-                                  enumValueToString(softcoreType)));
+                                  enumValueToString(softcoreType),
+                                  useDifferentLambdas ? "different" : "equal"));
 
         const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
-        const std::vector<real> lambdas(numFepCouplingTerms, lambda);
+        std::vector<real> lambdas(numFepCouplingTerms, lambda);
+        if (useDifferentLambdas)
+        {
+            lambdas[static_cast<int>(FreeEnergyPerturbationCouplingType::Vdw)] =
+                    0.6_real * lambda + 0.3_real;
+        }
 
         auto energy = [&](ArrayRef<const RVec> xTrial, const matrix boxTrial, ArrayRef<const real> lambdasTrial)
         {
@@ -489,7 +495,8 @@ protected:
         }
 
         std::vector<BondedKernelFlavor> flavors = { BondedKernelFlavor::ForcesAndVirialAndEnergy };
-        if (!input_.fep || lambda == 0)
+        // The SIMD flavor does not support perturbed interactions
+        if (!input_.fep || (lambda == 0 && !useDifferentLambdas))
         {
             flavors.push_back(BondedKernelFlavor::ForcesSimdWhenAvailable);
         }
@@ -591,13 +598,16 @@ TEST_P(ListedForcesPairsTest, DerivativesMatchEnergy)
         {
             for (SoftcoreType softcoreType : EnumerationWrapper<SoftcoreType>{})
             {
-                testDerivativesMatchEnergy(lambda, softcoreType);
+                for (const bool useDifferentLambdas : { false, true })
+                {
+                    testDerivativesMatchEnergy(lambda, softcoreType, useDifferentLambdas);
+                }
             }
         }
     }
     else
     {
-        testDerivativesMatchEnergy(0.0, SoftcoreType::Beutler);
+        testDerivativesMatchEnergy(0.0, SoftcoreType::Beutler, false);
     }
 }
 
