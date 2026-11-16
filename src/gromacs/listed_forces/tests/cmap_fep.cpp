@@ -46,6 +46,7 @@
 
 #include <array>
 #include <random>
+#include <tuple>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -54,8 +55,12 @@
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/topology/idef.h"
+#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/real.h"
+#include "gromacs/utility/vec.h"
+#include "gromacs/utility/vectypes.h"
 
+#include "testutils/finitedifference.h"
 #include "testutils/testasserts.h"
 
 namespace gmx
@@ -327,6 +332,118 @@ TEST(CmapFepTest, EnergyInterpolatesLinearlyNonFlatGrids)
                 << "dvdlambda incorrect at lambda=" << lambda;
     }
 }
+
+//! Test parameters for checking derivatives: PBC type and lambda
+using CmapDerivativesTestParameters = std::tuple<PbcType, real>;
+
+//! Test fixture for checking that CMAP forces, virial and dV/dlambda match the energy
+class CmapDerivativesTest : public ::testing::TestWithParam<CmapDerivativesTestParameters>
+{
+};
+
+TEST_P(CmapDerivativesTest, MatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+    const PbcType pbcType = std::get<0>(GetParam());
+    const real    lambda  = std::get<1>(GetParam());
+
+    constexpr int gridExtent = 24;
+    CmapGrids     grids;
+    grids.push_back(buildRandomGrid(gridExtent, 42));
+    grids.push_back(buildRandomGrid(gridExtent, 137));
+
+    t_iparams forceparams[1];
+    forceparams[0].cmap.cmapA   = 0;
+    forceparams[0].cmap.cmapB   = 1;
+    const t_iatom forceatoms[6] = { 0, 0, 1, 2, 3, 4 };
+
+    matrix box  = { { 0 } };
+    box[XX][XX] = box[YY][YY] = box[ZZ][ZZ] = 1.3;
+
+    //! Output of the CMAP kernel
+    struct Output
+    {
+        Output()
+        {
+            // RVec does not initialize its contents
+            forces.fill({ 0, 0, 0 });
+            shiftForces.fill({ 0, 0, 0 });
+        }
+        real                                energy    = 0;
+        real                                dvdlambda = 0;
+        std::array<RVec, 5>                 forces;
+        std::array<RVec, c_numShiftVectors> shiftForces;
+    };
+    auto compute = [&](ArrayRef<const RVec> xTrial, const matrix boxTrial, const real lambdaTrial)
+    {
+        t_pbc pbc;
+        set_pbc(&pbc, pbcType, boxTrial);
+        rvec4  f[5] = {};
+        Output output;
+        output.energy = cmap_dihs(6,
+                                  forceatoms,
+                                  forceparams,
+                                  grids,
+                                  as_rvec_array(xTrial.data()),
+                                  f,
+                                  as_rvec_array(output.shiftForces.data()),
+                                  &pbc,
+                                  lambdaTrial,
+                                  &output.dvdlambda,
+                                  {},
+                                  nullptr,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr);
+        for (int atom = 0; atom < 5; atom++)
+        {
+            output.forces[atom] = { f[atom][XX], f[atom][YY], f[atom][ZZ] };
+        }
+        return output;
+    };
+
+    const std::array<rvec, 5> xArray = buildAtomPositions();
+    std::vector<RVec>         xInCentralBox(xArray.begin(), xArray.end());
+    // Atoms in different periodic images exercise the shift forces
+    std::vector<RVec> xInDifferentImages = xInCentralBox;
+    if (pbcType != PbcType::No)
+    {
+        xInDifferentImages[1][XX] -= box[XX][XX];
+        xInDifferentImages[2][YY] += box[YY][YY];
+        xInDifferentImages[3][ZZ] -= box[ZZ][ZZ];
+        xInDifferentImages[4][XX] -= box[XX][XX];
+        xInDifferentImages[4][ZZ] -= box[ZZ][ZZ];
+    }
+
+    for (const std::vector<RVec>& x : { xInCentralBox, xInDifferentImages })
+    {
+        const Output output = compute(x, box, lambda);
+
+        checkForcesMatchEnergy(x,
+                               output.forces,
+                               [&](ArrayRef<const RVec> xTrial)
+                               { return compute(xTrial, box, lambda).energy; });
+        checkVirialMatchesEnergy(x,
+                                 box,
+                                 numPbcDimensions(pbcType),
+                                 output.forces,
+                                 output.shiftForces,
+                                 [&](ArrayRef<const RVec> xTrial, const matrix boxTrial)
+                                 { return compute(xTrial, boxTrial, lambda).energy; });
+        checkDvdlambdaMatchesEnergy(output.dvdlambda,
+                                    [&](const double lambdaChange)
+                                    { return compute(x, box, lambda + lambdaChange).energy; });
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(Cmap,
+                         CmapDerivativesTest,
+                         ::testing::Combine(::testing::Values(PbcType::No, PbcType::Xyz),
+                                            ::testing::Values(0.0, 0.3, 1.0)));
 
 } // namespace
 } // namespace test

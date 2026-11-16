@@ -122,6 +122,8 @@ public:
     iListInput setMorse(real b0A, real cbA, real betaA, real b0B, real cbB, real betaB);
     iListInput setMorse(real b0A, real cbA, real betaA);
     iListInput setFene(real bm, real kb);
+    iListInput setRestraintBonds(real lowA, real up1A, real up2A, real kA, real lowB, real up1B, real up2B, real kB);
+    iListInput setRestraintBonds(real lowA, real up1A, real up2A, real kA);
     iListInput setLinearAngle(real klinA, real aA, real klinB, real aB);
     iListInput setLinearAngle(real klinA, real aA);
     iListInput
@@ -134,6 +136,9 @@ public:
     iListInput setPDihedrals(InteractionFunction ft, real phiA, real cpA, int mult);
     iListInput setRbDihedrals(const real rbcA[NR_RBDIHS], const real rbcB[NR_RBDIHS]);
     iListInput setRbDihedrals(const real rbc[NR_RBDIHS]);
+    iListInput setCbtDihedrals(const real cbtc[NR_CBTDIHS]);
+    iListInput setDihedralRestraints(real phiA, real dphiA, real kfacA, real phiB, real dphiB, real kfacB);
+    iListInput setDihedralRestraints(real phiA, real dphiA, real kfacA);
     iListInput setPolarization(real alpha);
     iListInput setAnharmPolarization(real alpha, real drcut, real khyp);
     iListInput setTholePolarization(real a, real alpha1, real alpha2);

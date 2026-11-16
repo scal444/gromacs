@@ -54,8 +54,10 @@
 
 #include <cmath>
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -91,10 +93,12 @@
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/strconvert.h"
 #include "gromacs/utility/stringstream.h"
+#include "gromacs/utility/stringutil.h"
 #include "gromacs/utility/textwriter.h"
 #include "gromacs/utility/vec.h"
 #include "gromacs/utility/vectypes.h"
 
+#include "testutils/finitedifference.h"
 #include "testutils/refdata.h"
 #include "testutils/testasserts.h"
 
@@ -418,16 +422,17 @@ class NonbondedFepTest :
     public ::testing::TestWithParam<std::tuple<SoftcoreType, ListInput, PaddedVector<RVec>, real, real, bool>>
 {
 protected:
-    PaddedVector<RVec>   x_;
-    ListInput            input_;
-    real                 lambda_;
-    real                 softcoreAlpha_;
-    bool                 softcoreCoulomb_;
-    SoftcoreType         softcoreType_;
-    TestReferenceData    refData_;
-    TestReferenceChecker checker_;
+    PaddedVector<RVec> x_;
+    ListInput          input_;
+    real               lambda_;
+    real               softcoreAlpha_;
+    bool               softcoreCoulomb_;
+    SoftcoreType       softcoreType_;
+    TestReferenceData  refData_;
+    //! Created on first use, so tests that do not compare with reference data need no file
+    std::optional<TestReferenceChecker> checker_;
 
-    NonbondedFepTest() : checker_(refData_.rootChecker())
+    NonbondedFepTest()
     {
         softcoreType_    = std::get<0>(GetParam());
         input_           = std::get<1>(GetParam());
@@ -435,17 +440,31 @@ protected:
         lambda_          = std::get<3>(GetParam());
         softcoreAlpha_   = std::get<4>(GetParam());
         softcoreCoulomb_ = std::get<5>(GetParam());
-
-        // Note that the reference data for Ewald type interactions has been generated
-        // with accurate analytical approximations for the long-range corrections.
-        // When the free-energy kernel switches from tabulated to analytical corrections,
-        // the double precision tolerance can be tightend to 1e-11.
-        test::FloatingPointTolerance tolerance(
-                input_.floatToler, input_.doubleToler, 1.0e-6, 1.0e-11, 10000, 100, false);
-        checker_.setDefaultTolerance(tolerance);
     }
 
-    void testKernel()
+    //! Returns the checker for reference data
+    TestReferenceChecker& checker()
+    {
+        if (!checker_.has_value())
+        {
+            checker_ = refData_.rootChecker();
+            // Note that the reference data for Ewald type interactions has been generated
+            // with accurate analytical approximations for the long-range corrections.
+            // When the free-energy kernel switches from tabulated to analytical corrections,
+            // the double precision tolerance can be tightend to 1e-11.
+            test::FloatingPointTolerance tolerance(
+                    input_.floatToler, input_.doubleToler, 1.0e-6, 1.0e-11, 10000, 100, false);
+            checker_->setDefaultTolerance(tolerance);
+        }
+        return *checker_;
+    }
+
+    /*! \brief Runs the kernel and returns its output
+     *
+     * \param[in] x        Coordinates
+     * \param[in] lambdas  Lambda value for each perturbation component
+     */
+    OutputQuantities runKernel(const PaddedVector<RVec>& x, ArrayRef<const real> lambdas)
     {
         input_.frHelper.setSoftcoreAlpha(softcoreAlpha_);
         input_.frHelper.setSoftcoreCoulomb(softcoreCoulomb_);
@@ -462,26 +481,18 @@ protected:
         // output buffers
         OutputQuantities output;
 
-        // lambda vector
-        int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
-        std::vector<real> lambdas(numFepCouplingTerms, lambda_);
-
         // fep kernel data
         StepWorkload stepWork;
         stepWork.computeForces = true;
         stepWork.computeVirial = true;
         stepWork.computeEnergy = true;
 
-        // force buffers
-        bool                      unusedBool = true; // this bool has no effect in the kernel
-        gmx::ForceWithShiftForces forces(output.f.arrayRefWithPadding(), unusedBool, output.fShift);
-
         // dummy counter
         t_nrnb nrnb;
 
         // run fep kernel
         gmx_nb_free_energy_kernel(nbl,
-                                  x_.arrayRefWithPadding(),
+                                  x.constArrayRefWithPadding(),
                                   fr.use_simd_kernels,
                                   fr.ntype,
                                   *fr.ic,
@@ -502,13 +513,67 @@ protected:
                                   output.energy.energyGroupPairTerms[NonBondedEnergyTerms::LJSR],
                                   output.dvdLambda);
 
-        checkOutput(&checker_, output);
+        return output;
+    }
+
+    void testKernel()
+    {
+        const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
+        const std::vector<real> lambdas(numFepCouplingTerms, lambda_);
+
+        const OutputQuantities output = runKernel(x_, lambdas);
+
+        checkOutput(&checker(), output);
+    }
+
+    //! Checks that forces and dV/dlambda are derivatives of the energy
+    void testDerivativesMatchEnergy()
+    {
+        const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
+        const std::vector<real> lambdas(numFepCouplingTerms, lambda_);
+
+        auto energy = [&](ArrayRef<const RVec> xTrial, ArrayRef<const real> lambdasTrial) -> double
+        {
+            PaddedVector<RVec> xPadded(xTrial.size());
+            std::copy(xTrial.begin(), xTrial.end(), xPadded.begin());
+            const OutputQuantities trialOutput = runKernel(xPadded, lambdasTrial);
+            return trialOutput.energy.energyGroupPairTerms[NonBondedEnergyTerms::CoulombSR][0]
+                   + trialOutput.energy.energyGroupPairTerms[NonBondedEnergyTerms::LJSR][0];
+        };
+
+        const OutputQuantities output = runKernel(x_, lambdas);
+
+        checkForcesMatchEnergy(
+                x_, output.f, [&](ArrayRef<const RVec> xTrial) { return energy(xTrial, lambdas); });
+
+        for (const auto couplingType :
+             { FreeEnergyPerturbationCouplingType::Coul, FreeEnergyPerturbationCouplingType::Vdw })
+        {
+            SCOPED_TRACE(formatString("Testing lambda component %s", enumValueToString(couplingType)));
+            checkDvdlambdaMatchesEnergy(output.dvdLambda[static_cast<int>(couplingType)],
+                                        [&](const double lambdaChange)
+                                        {
+                                            std::vector<real> lambdasTrial = lambdas;
+                                            lambdasTrial[static_cast<int>(couplingType)] += lambdaChange;
+                                            return energy(x_, lambdasTrial);
+                                        });
+        }
     }
 };
 
 TEST_P(NonbondedFepTest, testKernel)
 {
     testKernel();
+}
+
+TEST_P(NonbondedFepTest, DerivativesMatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+    testDerivativesMatchEnergy();
 }
 
 //! configurations to test

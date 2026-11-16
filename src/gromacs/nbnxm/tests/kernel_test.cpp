@@ -108,6 +108,7 @@
 #include "gromacs/utility/vec.h"
 #include "gromacs/utility/vectypes.h"
 
+#include "testutils/finitedifference.h"
 #include "testutils/refdata.h"
 #include "testutils/testasserts.h"
 #include "testutils/testinit.h"
@@ -450,16 +451,10 @@ std::string makeRefDataFileName()
     return refDataFileName;
 }
 
-} // namespace
-
-//! Test case that checks that the NBNxM kernel produces correct output.
-TEST_P(NbnxmKernelTest, WorksWith)
+//! Returns the kernel options that correspond to the test parameters
+KernelOptions kernelOptionsFromParameters(const KernelInputParameters& parameters_)
 {
-    // The test parameters with which the test case was instantiated
-    // TODO rename these in a follow-up change to conform to style
-    KernelInputParameters               parameters_ = GetParam();
-    KernelOptions                       options_;
-    std::unique_ptr<nonbonded_verlet_t> nbv_;
+    KernelOptions options_;
 
     options_.kernelSetup.kernelType = parameters_.kernelType;
 
@@ -486,6 +481,80 @@ TEST_P(NbnxmKernelTest, WorksWith)
         default: options_.vdwModifier = InteractionModifiers::PotShift; break;
     }
     options_.useLJPme = (parameters_.vdwKernelType == vdwktLJEWALDCOMBGEOM);
+
+    return options_;
+}
+
+//! The output of a nonbonded kernel
+struct KernelOutput
+{
+    //! The forces, in the order of the atoms in the test system
+    std::vector<RVec> forces;
+    //! The Van der Waals energies for each energy-group pair
+    std::vector<real> vVdw;
+    //! The Coulomb energies for each energy-group pair
+    std::vector<real> vCoulomb;
+};
+
+//! Sets up the pair search and pairlist for \c system, calls the kernel and returns its output
+KernelOutput runKernel(const KernelOptions& options, const TestSystem& system, const interaction_const_t& ic)
+{
+    std::unique_ptr<nonbonded_verlet_t> nbv = setupNbnxmForBenchInstance(options, system);
+    nbv->constructPairlist(InteractionLocality::Local, system.excls, false, 0, nullptr);
+
+    std::vector<RVec> shiftVecs(c_numShiftVectors);
+    calc_shifts(system.box, shiftVecs);
+
+    StepWorkload stepWork;
+    stepWork.computeForces = true;
+    stepWork.computeEnergy = options.energyHandling != EnergyHandling::NoEnergies;
+
+    KernelOutput output;
+    output.vVdw.resize(square(sc_numEnergyGroups[options.energyHandling]));
+    output.vCoulomb.resize(square(sc_numEnergyGroups[options.energyHandling]));
+
+    // Call the kernel to test
+    nbv->dispatchNonbondedKernel(
+            InteractionLocality::Local, ic, stepWork, enbvClearFYes, shiftVecs, output.vVdw, output.vCoulomb, nullptr);
+
+    const bool atomOrderMatches = nbv->localAtomOrderMatchesNbnxmOrder();
+
+    // Get the forces
+    ArrayRef<const int> atomIndices = nbv->getLocalAtomOrder();
+    std::vector<RVec> nbnxmForces(atomOrderMatches ? atomIndices.size() : system.coordinates.size(),
+                                  { 0.0_real, 0.0_real, 0.0_real });
+    nbv->atomdata_add_nbat_f_to_f(AtomLocality::All, nbnxmForces);
+
+    if (atomOrderMatches)
+    {
+        // Copy atoms to a buffer with local atom order
+        output.forces.resize(system.coordinates.size());
+        for (gmx::Index i = 0; i < atomIndices.ssize(); i++)
+        {
+            const int a = atomIndices[i];
+            if (nonbonded_verlet_t::isValidLocalAtom(a))
+            {
+                output.forces[a] = nbnxmForces[i];
+            }
+        }
+    }
+    else
+    {
+        output.forces = nbnxmForces;
+    }
+
+    return output;
+}
+
+} // namespace
+
+//! Test case that checks that the NBNxM kernel produces correct output.
+TEST_P(NbnxmKernelTest, WorksWith)
+{
+    // The test parameters with which the test case was instantiated
+    // TODO rename these in a follow-up change to conform to style
+    KernelInputParameters parameters_ = GetParam();
+    const KernelOptions   options_    = kernelOptionsFromParameters(parameters_);
 
     const bool kernelIsPlainC = kernelTypeIsPlainC(options_.kernelSetup.kernelType);
 
@@ -610,53 +679,10 @@ TEST_P(NbnxmKernelTest, WorksWith)
     // Coulomb energy errors are higher
     coulombEnergyChecker.setDefaultTolerance(absoluteTolerance(10 * tolerance));
 
-    // Finish setting up data structures
-    nbv_ = setupNbnxmForBenchInstance(options_, system_);
-    nbv_->constructPairlist(InteractionLocality::Local, system_.excls, false, 0, nullptr);
-
-    std::vector<RVec> shiftVecs(c_numShiftVectors);
-    calc_shifts(system_.box, shiftVecs);
-
-    StepWorkload stepWork;
-    stepWork.computeForces = true;
-    stepWork.computeEnergy = options_.energyHandling != EnergyHandling::NoEnergies;
-
-    std::vector<real> vVdw(square(sc_numEnergyGroups[options_.energyHandling]));
-    std::vector<real> vCoulomb(square(sc_numEnergyGroups[options_.energyHandling]));
-
-    // Call the kernel to test
-    nbv_->dispatchNonbondedKernel(
-            InteractionLocality::Local, ic, stepWork, enbvClearFYes, shiftVecs, vVdw, vCoulomb, nullptr);
-
-    const bool atomOrderMatches = nbv_->localAtomOrderMatchesNbnxmOrder();
-
-    // Get and check the forces
-    ArrayRef<const int> atomIndices = nbv_->getLocalAtomOrder();
-    std::vector<RVec> nbnxmForces(atomOrderMatches ? atomIndices.size() : system_.coordinates.size(),
-                                  { 0.0_real, 0.0_real, 0.0_real });
-    nbv_->atomdata_add_nbat_f_to_f(AtomLocality::All, nbnxmForces);
-
-    std::vector<RVec>    forceBuffer;
-    ArrayRef<const RVec> forces;
-    if (atomOrderMatches)
-    {
-        // Copy atoms to a buffer with local atom order
-        forceBuffer.resize(system_.coordinates.size());
-        for (gmx::Index i = 0; i < atomIndices.ssize(); i++)
-        {
-            const int a = atomIndices[i];
-            if (nonbonded_verlet_t::isValidLocalAtom(a))
-            {
-                forceBuffer[a] = nbnxmForces[i];
-            }
-        }
-
-        forces = forceBuffer;
-    }
-    else
-    {
-        forces = nbnxmForces;
-    }
+    const KernelOutput       output   = runKernel(options_, system_, ic);
+    const std::vector<RVec>& forces   = output.forces;
+    const std::vector<real>& vVdw     = output.vVdw;
+    const std::vector<real>& vCoulomb = output.vCoulomb;
 
     forceChecker.checkSequence(forces.begin(), forces.end(), "Forces");
 
@@ -690,6 +716,94 @@ TEST_P(NbnxmKernelTest, WorksWith)
                 vCoulomb.begin(), vCoulomb.end(), "Coulomb group pair energy");
     }
 };
+
+//! Test fixture for checking that the forces of a kernel are consistent with its energies
+class NbnxmKernelDerivativesTest : public NbnxmKernelTest
+{
+};
+
+/*! \brief Checks that the forces are the derivative of the energy
+ *
+ * As NbnxmKernelTest checks that all kernel flavors produce the same
+ * forces and energies, it is sufficient to check this for the flavors
+ * that are most accurate.
+ */
+TEST_P(NbnxmKernelDerivativesTest, ForcesMatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+    const KernelInputParameters parameters = GetParam();
+    const KernelOptions         options    = kernelOptionsFromParameters(parameters);
+
+    if (!sc_haveNbnxmSimd4xmKernels && parameters.kernelType == NbnxmKernelType::Cpu4xN_Simd_4xN)
+    {
+        GTEST_SKIP() << "Cannot test 4xN kernels without suitable SIMD support";
+    }
+    if (!sc_haveNbnxmSimd2xmmKernels && parameters.kernelType == NbnxmKernelType::Cpu4xN_Simd_2xNN)
+    {
+        GTEST_SKIP() << "Cannot test 2xNN kernels without suitable SIMD support";
+    }
+
+    const TestSystem system(parameters.vdwKernelType == vdwktLJCUT_COMBGEOM
+                                    ? LJCombinationRule::Geometric
+                                    : LJCombinationRule::LorentzBerthelot,
+                            true);
+
+    const interaction_const_t ic = setupInteractionConst(options);
+
+    // Computing the derivatives for all atoms would take long. Instead we use
+    // the oxygen and a hydrogen from the first molecule of each third of
+    // the system, as each third uses different interactions.
+    const int        numAtoms = gmx::ssize(system.coordinates);
+    std::vector<int> atomsToCheck;
+    for (const int firstAtomOfMolecule : { 0, numAtoms / 3, 2 * numAtoms / 3 })
+    {
+        atomsToCheck.push_back(firstAtomOfMolecule);
+        atomsToCheck.push_back(firstAtomOfMolecule + 1);
+    }
+
+    const KernelOutput output = runKernel(options, system, ic);
+
+    std::vector<RVec> coordinatesToCheck;
+    std::vector<RVec> forcesToCheck;
+    for (const int atom : atomsToCheck)
+    {
+        coordinatesToCheck.push_back(system.coordinates[atom]);
+        forcesToCheck.push_back(output.forces[atom]);
+    }
+
+    TestSystem trialSystem = system;
+    auto       energy      = [&](ArrayRef<const RVec> xTrial) -> double
+    {
+        for (gmx::Index i = 0; i < gmx::ssize(atomsToCheck); i++)
+        {
+            trialSystem.coordinates[atomsToCheck[i]] = xTrial[i];
+        }
+        const KernelOutput trialOutput = runKernel(options, trialSystem, ic);
+        return std::accumulate(trialOutput.vVdw.begin(), trialOutput.vVdw.end(), 0.0)
+               + std::accumulate(trialOutput.vCoulomb.begin(), trialOutput.vCoulomb.end(), 0.0);
+    };
+
+    checkForcesMatchEnergy(coordinatesToCheck, forcesToCheck, energy);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+        Combinations,
+        NbnxmKernelDerivativesTest,
+        ::testing::ConvertGenerator<KernelInputParameters::TupleT>(::testing::Combine(
+                ::testing::Values(NbnxmKernelType::Cpu4xN_Simd_4xN, NbnxmKernelType::Cpu4xN_Simd_2xNN),
+                ::testing::Values(CoulombKernelType::ReactionField, CoulombKernelType::Ewald, CoulombKernelType::EwaldTwin),
+                ::testing::Values(int(vdwktLJCUT_COMBGEOM),
+                                  int(vdwktLJCUT_COMBLB),
+                                  int(vdwktLJCUT_COMBNONE),
+                                  int(vdwktLJFORCESWITCH),
+                                  int(vdwktLJPOTSWITCH),
+                                  int(vdwktLJEWALDCOMBGEOM)),
+                ::testing::Values(EnergyHandling::Energies, EnergyHandling::ThreeEnergyGroups))),
+        nameOfTest);
 
 INSTANTIATE_TEST_SUITE_P(Combinations,
                          NbnxmKernelTest,

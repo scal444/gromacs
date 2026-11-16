@@ -487,7 +487,7 @@ protected:
      *        instantiation via testing::Combine with getHardwareContextsWithCapability().
      *       Custom parameter-dependent skip logic can be added via the virtual
      *       addCustomSkipReasons() hook, which runs in SetUp(). The reference data
-     *       checker is created in SetUp() after all skip checks complete.
+     *       checker is created on first use, i.e. after all skip checks complete.
      */
     explicit HardwareTestFixture(typename TestHelper::InputConfigFormatters inputFormatters) :
         refData_(TestHelper::refDataFilenameMaker(inputFormatters)(this->GetParam()))
@@ -495,7 +495,7 @@ protected:
         hardwareContext_ = std::get<std::tuple_size_v<ParametersTuple> - 1>(this->GetParam());
     }
 
-    /*! \brief SetUp override - performs custom skip checks and creates checker
+    /*! \brief SetUp override - performs custom skip checks
      *
      * Called by GoogleTest after construction is complete. This is where
      * custom skip logic runs via the virtual addCustomSkipReasons() hook.
@@ -524,9 +524,6 @@ protected:
         {
             GTEST_SKIP() << skipReasons.toString();
         }
-
-        // NOW safe to create checker (after all skip checks)
-        checker_ = refData_.rootChecker();
     }
 
     /*! \brief Virtual hook for derived classes to add custom skip conditions
@@ -550,12 +547,16 @@ protected:
 
     /*! \brief Get reference checker
      *
-     * Safe to call after SetUp() completes. Asserts if called before
-     * checker is initialized (which should be impossible if used correctly).
+     * The checker is created on first use, so that tests that are
+     * skipped, or that verify their results without reference data,
+     * do not require a reference-data file to exist.
      */
     TestReferenceChecker& checker()
     {
-        GMX_RELEASE_ASSERT(checker_.has_value(), "Checker not initialized - was SetUp() called?");
+        if (!checker_.has_value())
+        {
+            checker_ = refData_.rootChecker();
+        }
         return *checker_;
     }
 
@@ -578,7 +579,7 @@ private:
     //! Reference data (created in constructor, before skip checks)
     TestReferenceData refData_;
 
-    //! Reference checker (created in SetUp() after skip checks, hence optional)
+    //! Reference checker (created on first use, hence optional)
     std::optional<TestReferenceChecker> checker_;
 
     //! Hardware context (extracted from parameters for convenience)

@@ -72,6 +72,7 @@ bool iListInput::hasFepParameters() const
     switch (ft)
     {
         case InteractionFunction::Bonds:
+        case InteractionFunction::HarmonicPotential:
         case InteractionFunction::GROMOS96Bonds:
         case InteractionFunction::Angles:
         case InteractionFunction::GROMOS96Angles:
@@ -92,7 +93,19 @@ bool iListInput::hasFepParameters() const
             return (iparams.u_b.thetaA != iparams.u_b.thetaB || iparams.u_b.kthetaA != iparams.u_b.kthetaB
                     || iparams.u_b.r13A != iparams.u_b.r13B || iparams.u_b.kUBA != iparams.u_b.kUBB);
 
+        case InteractionFunction::RestraintBonds:
+            return (iparams.restraint.lowA != iparams.restraint.lowB
+                    || iparams.restraint.up1A != iparams.restraint.up1B
+                    || iparams.restraint.up2A != iparams.restraint.up2B
+                    || iparams.restraint.kA != iparams.restraint.kB);
+
+        case InteractionFunction::DihedralRestraints:
+            return (iparams.dihres.phiA != iparams.dihres.phiB
+                    || iparams.dihres.dphiA != iparams.dihres.dphiB
+                    || iparams.dihres.kfacA != iparams.dihres.kfacB);
+
         case InteractionFunction::ProperDihedrals:
+        case InteractionFunction::PeriodicImproperDihedrals:
         case InteractionFunction::AngleRestraints:
         case InteractionFunction::AngleZAxisRestraints:
             return (iparams.pdihs.phiA != iparams.pdihs.phiB || iparams.pdihs.cpA != iparams.pdihs.cpB);
@@ -161,6 +174,26 @@ iListInput iListInput::setFene(real bm, real kb)
     iparams.fene.bm = bm;
     iparams.fene.kb = kb;
     return *this;
+}
+
+iListInput
+iListInput::setRestraintBonds(real lowA, real up1A, real up2A, real kA, real lowB, real up1B, real up2B, real kB)
+{
+    ftype                  = InteractionFunction::RestraintBonds;
+    iparams.restraint.lowA = lowA;
+    iparams.restraint.up1A = up1A;
+    iparams.restraint.up2A = up2A;
+    iparams.restraint.kA   = kA;
+    iparams.restraint.lowB = lowB;
+    iparams.restraint.up1B = up1B;
+    iparams.restraint.up2B = up2B;
+    iparams.restraint.kB   = kB;
+    return *this;
+}
+
+iListInput iListInput::setRestraintBonds(real lowA, real up1A, real up2A, real kA)
+{
+    return setRestraintBonds(lowA, up1A, up2A, kA, lowA, up1A, up2A, kA);
 }
 
 iListInput iListInput::setLinearAngle(real klinA, real aA, real klinB, real aB)
@@ -265,6 +298,34 @@ iListInput iListInput::setRbDihedrals(const real rbcA[NR_RBDIHS], const real rbc
 iListInput iListInput::setRbDihedrals(const real rbc[NR_RBDIHS])
 {
     return setRbDihedrals(rbc, rbc);
+}
+
+iListInput iListInput::setCbtDihedrals(const real cbtc[NR_CBTDIHS])
+{
+    ftype = InteractionFunction::CombinedBendingTorsionPotential;
+    for (int i = 0; i < NR_CBTDIHS; i++)
+    {
+        iparams.cbtdihs.cbtcA[i] = cbtc[i];
+        iparams.cbtdihs.cbtcB[i] = cbtc[i];
+    }
+    return *this;
+}
+
+iListInput iListInput::setDihedralRestraints(real phiA, real dphiA, real kfacA, real phiB, real dphiB, real kfacB)
+{
+    ftype                = InteractionFunction::DihedralRestraints;
+    iparams.dihres.phiA  = phiA;
+    iparams.dihres.dphiA = dphiA;
+    iparams.dihres.kfacA = kfacA;
+    iparams.dihres.phiB  = phiB;
+    iparams.dihres.dphiB = dphiB;
+    iparams.dihres.kfacB = kfacB;
+    return *this;
+}
+
+iListInput iListInput::setDihedralRestraints(real phiA, real dphiA, real kfacA)
+{
+    return setDihedralRestraints(phiA, dphiA, kfacA, phiA, dphiA, kfacA);
 }
 
 iListInput iListInput::setPolarization(real alpha)

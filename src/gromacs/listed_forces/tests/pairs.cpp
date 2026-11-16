@@ -90,6 +90,7 @@
 #include "gromacs/utility/vec.h"
 #include "gromacs/utility/vectypes.h"
 
+#include "testutils/finitedifference.h"
 #include "testutils/refdata.h"
 #include "testutils/testasserts.h"
 
@@ -304,15 +305,16 @@ class ListedForcesPairsTest :
     public ::testing::TestWithParam<std::tuple<ListInput, PaddedVector<RVec>, PbcType>>
 {
 protected:
-    matrix               box_;
-    t_pbc                pbc_;
-    PaddedVector<RVec>   x_;
-    PbcType              pbcType_;
-    ListInput            input_;
-    TestReferenceData    refData_;
-    TestReferenceChecker checker_;
+    matrix             box_;
+    t_pbc              pbc_;
+    PaddedVector<RVec> x_;
+    PbcType            pbcType_;
+    ListInput          input_;
+    TestReferenceData  refData_;
+    //! Created on first use, so tests that do not compare with reference data need no file
+    std::optional<TestReferenceChecker> checker_;
 
-    ListedForcesPairsTest() : checker_(refData_.rootChecker())
+    ListedForcesPairsTest()
     {
         input_   = std::get<0>(GetParam());
         x_       = std::get<1>(GetParam());
@@ -320,17 +322,34 @@ protected:
         clear_mat(box_);
         box_[0][0] = box_[1][1] = box_[2][2] = 1.0;
         set_pbc(&pbc_, pbcType_, box_);
-
-        FloatingPointTolerance tolerance = relativeToleranceAsPrecisionDependentFloatingPoint(
-                1.0, input_.floatToler, input_.doubleToler);
-
-        checker_.setDefaultTolerance(tolerance);
     }
 
-    void testOneIfunc(TestReferenceChecker* checker, const real lambda, const SoftcoreType softcoreType)
+    //! Returns the checker for reference data
+    TestReferenceChecker& checker()
     {
-        SCOPED_TRACE(std::string("Testing PBC type: ") + c_pbcTypeNames[pbcType_]);
+        if (!checker_.has_value())
+        {
+            checker_ = refData_.rootChecker();
+            checker_->setDefaultTolerance(relativeToleranceAsPrecisionDependentFloatingPoint(
+                    1.0, input_.floatToler, input_.doubleToler));
+        }
+        return *checker_;
+    }
 
+    /*! \brief Calls the pair kernel and returns its output
+     *
+     * \param[in] x             Coordinates
+     * \param[in] pbc           PBC information
+     * \param[in] lambdas       Lambda value for each perturbation component
+     * \param[in] softcoreType  The type of soft-core to use for perturbed interactions
+     * \param[in] flavor        The kernel flavor
+     */
+    OutputQuantities runPairs(ArrayRef<const RVec>     x,
+                              const t_pbc&             pbc,
+                              ArrayRef<const real>     lambdas,
+                              const SoftcoreType       softcoreType,
+                              const BondedKernelFlavor flavor)
+    {
         // 'definition of pairs' is a concatenation of #npairs (here 2)
         // 'nAtomsPerPair+1'-tuples (fType a_0 a_i ... a_nAtomsPerPair)
         std::vector<t_iatom> iatoms = { 0, 1, 2, 0, 0, 2 };
@@ -350,12 +369,53 @@ protected:
         {
             fr->bMolPBC = true;
         }
+        fr->use_simd_kernels = (flavor == BondedKernelFlavor::ForcesSimdWhenAvailable);
+
+        StepWorkload stepWork;
+        stepWork.computeVirial = computeVirial(flavor);
+        stepWork.computeEnergy = computeEnergy(flavor);
+
+        bool havePerturbedInteractions = input_.fep;
+        if (flavor == BondedKernelFlavor::ForcesSimdWhenAvailable)
+        {
+            havePerturbedInteractions = false;
+        }
+
+        int              numEnergyTerms = static_cast<int>(NonBondedEnergyTerms::Count);
+        OutputQuantities output(numEnergyTerms);
+
+        do_pairs(input_.fType.value(),
+                 iatoms.size(),
+                 iatoms.data(),
+                 &input_.iparams,
+                 as_rvec_array(x.data()),
+                 output.f,
+                 output.fShift,
+                 &pbc,
+                 lambdas.data(),
+                 output.dvdLambda.data(),
+                 chargeA,
+                 chargeB,
+                 makeConstArrayRef(bPerturbed),
+                 cENER,
+                 nPerturbed,
+                 *fr,
+                 havePerturbedInteractions,
+                 stepWork,
+                 &output.energy,
+                 ddgatindex.data());
+
+        return output;
+    }
+
+    void testOneIfunc(TestReferenceChecker* checker, const real lambda, const SoftcoreType softcoreType)
+    {
+        SCOPED_TRACE(std::string("Testing PBC type: ") + c_pbcTypeNames[pbcType_]);
 
         std::vector<BondedKernelFlavor> flavors = { BondedKernelFlavor::ForcesAndVirialAndEnergy };
 
         if (!input_.fep || lambda == 0)
         {
-            fr->use_simd_kernels = true;
             flavors.push_back(BondedKernelFlavor::ForcesSimdWhenAvailable);
         }
 
@@ -363,41 +423,10 @@ protected:
         {
             SCOPED_TRACE("Testing bonded kernel flavor: " + c_bondedKernelFlavorStrings[flavor]);
 
-            StepWorkload stepWork;
-            stepWork.computeVirial = computeVirial(flavor);
-            stepWork.computeEnergy = computeEnergy(flavor);
+            const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
+            const std::vector<real> lambdas(numFepCouplingTerms, lambda);
 
-            bool havePerturbedInteractions = input_.fep;
-            if (flavor == BondedKernelFlavor::ForcesSimdWhenAvailable)
-            {
-                havePerturbedInteractions = false;
-            }
-
-            int numEnergyTerms      = static_cast<int>(NonBondedEnergyTerms::Count);
-            int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
-            OutputQuantities  output(numEnergyTerms);
-            std::vector<real> lambdas(numFepCouplingTerms, lambda);
-
-            do_pairs(input_.fType.value(),
-                     iatoms.size(),
-                     iatoms.data(),
-                     &input_.iparams,
-                     as_rvec_array(x_.data()),
-                     output.f,
-                     output.fShift,
-                     &pbc_,
-                     lambdas.data(),
-                     output.dvdLambda.data(),
-                     chargeA,
-                     chargeB,
-                     makeConstArrayRef(bPerturbed),
-                     cENER,
-                     nPerturbed,
-                     *fr,
-                     havePerturbedInteractions,
-                     stepWork,
-                     &output.energy,
-                     ddgatindex.data());
+            const OutputQuantities output = runPairs(x_, pbc_, lambdas, softcoreType, flavor);
 
             checkOutput(checker, output, flavor, input_.fType.value());
             auto shiftForcesChecker = checker->checkCompound("Shift-Forces", "Shift-forces");
@@ -415,11 +444,112 @@ protected:
         }
     }
 
+    //! Returns the sum of the energy terms that the pair kernel computes
+    static double totalEnergy(const OutputQuantities& output)
+    {
+        double energy = 0;
+        for (const NonBondedEnergyTerms term : { NonBondedEnergyTerms::Coulomb14,
+                                                 NonBondedEnergyTerms::LJ14,
+                                                 NonBondedEnergyTerms::CoulombSR,
+                                                 NonBondedEnergyTerms::LJSR })
+        {
+            energy += output.energy.energyGroupPairTerms[term][0];
+        }
+        return energy;
+    }
+
+    /*! \brief Checks that forces, virial and dV/dlambda are derivatives of the energy
+     *
+     * The energy always comes from the plain-C flavor, the derivatives
+     * from all flavors supported for the input. */
+    void testDerivativesMatchEnergy(const real lambda, const SoftcoreType softcoreType)
+    {
+        SCOPED_TRACE(formatString("Testing PBC type: %s, lambda %g, soft-core type %s",
+                                  c_pbcTypeNames[pbcType_].c_str(),
+                                  lambda,
+                                  enumValueToString(softcoreType)));
+
+        const int numFepCouplingTerms = static_cast<int>(FreeEnergyPerturbationCouplingType::Count);
+        const std::vector<real> lambdas(numFepCouplingTerms, lambda);
+
+        auto energy = [&](ArrayRef<const RVec> xTrial, const matrix boxTrial, ArrayRef<const real> lambdasTrial)
+        {
+            t_pbc pbcTrial;
+            set_pbc(&pbcTrial, pbcType_, boxTrial);
+            return totalEnergy(runPairs(
+                    xTrial, pbcTrial, lambdasTrial, softcoreType, BondedKernelFlavor::ForcesAndVirialAndEnergy));
+        };
+
+        FiniteDifferenceSettings settings;
+        if (!input_.fep)
+        {
+            // Unperturbed pairs use cubic-spline tables, which have discontinuous
+            // higher derivatives, which limits the accuracy of the stencil.
+            settings.relativeTolerance = 1e-5;
+        }
+
+        std::vector<BondedKernelFlavor> flavors = { BondedKernelFlavor::ForcesAndVirialAndEnergy };
+        if (!input_.fep || lambda == 0)
+        {
+            flavors.push_back(BondedKernelFlavor::ForcesSimdWhenAvailable);
+        }
+        for (const auto flavor : flavors)
+        {
+            SCOPED_TRACE("Testing bonded kernel flavor: " + c_bondedKernelFlavorStrings[flavor]);
+
+            const OutputQuantities output = runPairs(x_, pbc_, lambdas, softcoreType, flavor);
+
+            std::vector<RVec> forces;
+            for (const rvec4& force : output.f)
+            {
+                forces.emplace_back(force[XX], force[YY], force[ZZ]);
+            }
+            checkForcesMatchEnergy(
+                    x_,
+                    forces,
+                    [&](ArrayRef<const RVec> xTrial) { return energy(xTrial, box_, lambdas); },
+                    settings);
+
+            if (computeVirial(flavor))
+            {
+                checkVirialMatchesEnergy(
+                        x_,
+                        box_,
+                        numPbcDimensions(pbcType_),
+                        forces,
+                        arrayRefFromArray(reinterpret_cast<const RVec*>(output.fShift), c_numShiftVectors),
+                        [&](ArrayRef<const RVec> xTrial, const matrix boxTrial)
+                        { return energy(xTrial, boxTrial, lambdas); },
+                        settings);
+            }
+
+            if (computeEnergy(flavor))
+            {
+                for (const auto couplingType : { FreeEnergyPerturbationCouplingType::Coul,
+                                                 FreeEnergyPerturbationCouplingType::Vdw })
+                {
+                    SCOPED_TRACE(formatString("Testing lambda component %s",
+                                              enumValueToString(couplingType)));
+                    checkDvdlambdaMatchesEnergy(
+                            output.dvdLambda[static_cast<int>(couplingType)],
+                            [&](const double lambdaChange)
+                            {
+                                std::vector<real> lambdasTrial = lambdas;
+                                lambdasTrial[static_cast<int>(couplingType)] += lambdaChange;
+                                return energy(x_, box_, lambdasTrial);
+                            },
+                            settings);
+                }
+            }
+        }
+    }
+
     void testIfunc()
     {
         EXPECT_TRUE(input_.fType.has_value() && input_.fType < InteractionFunction::Count);
         TestReferenceChecker thisChecker =
-                checker_.checkCompound("FunctionType", interaction_function[input_.fType.value()].name)
+                checker()
+                        .checkCompound("FunctionType", interaction_function[input_.fType.value()].name)
                         .checkCompound("FEP", (input_.fep ? "Yes" : "No"));
 
         if (input_.fep)
@@ -446,6 +576,29 @@ protected:
 TEST_P(ListedForcesPairsTest, Ifunc)
 {
     testIfunc();
+}
+
+TEST_P(ListedForcesPairsTest, DerivativesMatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+    if (input_.fep)
+    {
+        for (const real lambda : { 0.0, 0.3, 0.5, 1.0 })
+        {
+            for (SoftcoreType softcoreType : EnumerationWrapper<SoftcoreType>{})
+            {
+                testDerivativesMatchEnergy(lambda, softcoreType);
+            }
+        }
+    }
+    else
+    {
+        testDerivativesMatchEnergy(0.0, SoftcoreType::Beutler);
+    }
 }
 
 //! Function types for testing 1-4 interaction. Add new terms at the end.

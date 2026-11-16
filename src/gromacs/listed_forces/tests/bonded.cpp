@@ -51,10 +51,12 @@
 #include <cstdint>
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <ostream>
+#include <random>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -76,6 +78,7 @@
 #include "gromacs/utility/vec.h"
 #include "gromacs/utility/vectypes.h"
 
+#include "testutils/finitedifference.h"
 #include "testutils/hardware_test_fixture.h"
 #include "testutils/naming.h"
 #include "testutils/refdata.h"
@@ -440,6 +443,68 @@ protected:
         testOneIfunc(&thisChecker, iatoms);
     }
 
+    /*! \brief Check that the derivatives computed by the kernel match those of the energy
+     *
+     * The forces, the virial contribution (when the flavor computes
+     * shift forces) and dV/dlambda (when the flavor computes
+     * energies) from the flavor under test are compared with
+     * numerical derivatives of the energy. The energy always comes
+     * from the plain-C energy flavor, so this also checks the
+     * force-only and SIMD flavors against the potential they claim
+     * to implement.
+     *
+     * \returns The output of the flavor under test for coordinates \c x
+     */
+    OutputQuantities testDerivativesMatchEnergy(const PaddedVector<RVec>& x)
+    {
+        std::vector<t_iatom> iatoms;
+        fillIatoms(input_.ftype, &iatoms);
+
+        auto energy = [&](ArrayRef<const RVec> xTrial, const matrix boxTrial, const real lambda) -> double
+        {
+            t_pbc pbcTrial;
+            set_pbc(&pbcTrial, pbcType_, boxTrial);
+            PaddedVector<RVec> xPadded(xTrial.size());
+            std::copy(xTrial.begin(), xTrial.end(), xPadded.begin());
+            OutputQuantities trialOutput;
+            runBondedCpu(
+                    input_, iatoms, xPadded, &pbcTrial, lambda, BondedKernelFlavor::ForcesAndVirialAndEnergy, &trialOutput);
+            return trialOutput.energy;
+        };
+
+        OutputQuantities output;
+        runBondedCpu(input_, iatoms, x, &pbc_, lambda_, flavor_, &output);
+
+        std::vector<RVec> forces;
+        for (const rvec4& force : output.f)
+        {
+            forces.emplace_back(force[XX], force[YY], force[ZZ]);
+        }
+        checkForcesMatchEnergy(
+                x, forces, [&](ArrayRef<const RVec> xTrial) { return energy(xTrial, box_, lambda_); });
+
+        if (computeVirial(flavor_))
+        {
+            checkVirialMatchesEnergy(
+                    x,
+                    box_,
+                    numPbcDimensions(pbcType_),
+                    forces,
+                    arrayRefFromArray(reinterpret_cast<const RVec*>(output.fshift), c_numShiftVectors),
+                    [&](ArrayRef<const RVec> xTrial, const matrix boxTrial)
+                    { return energy(xTrial, boxTrial, lambda_); });
+        }
+
+        if (computeEnergy(flavor_))
+        {
+            checkDvdlambdaMatchesEnergy(output.dvdlambda,
+                                        [&](const double lambdaChange)
+                                        { return energy(x, box_, lambda_ + lambdaChange); });
+        }
+
+        return output;
+    }
+
     //! Override to add parameter-dependent skip logic
     void addCustomSkipReasons(MessageStringCollector& skipReasons) override
     {
@@ -492,6 +557,83 @@ TEST_P(ListedForcesTest, Ifunc)
     testIfunc();
 }
 
+TEST_P(ListedForcesTest, DerivativesMatchEnergy)
+{
+    if (!c_canTestWithFiniteDifferences)
+    {
+        GTEST_SKIP() << "Numerical derivatives of the energy are only accurate enough in double "
+                        "precision";
+    }
+    if (isGpuTest())
+    {
+        GTEST_SKIP() << "Forces computed on GPUs are compared with those from CPUs by the "
+                        "reference data";
+    }
+    if (input_.ftype == InteractionFunction::WaterPolarization)
+    {
+        GTEST_SKIP() << "Water polarization by design only applies forces to the shell and dummy "
+                        "particle and thus is not conservative";
+    }
+
+    // The configuration from the test parameters, followed by distorted
+    // versions of it so the check does not rely on a single geometry
+    std::vector<PaddedVector<RVec>>      configurations = { x_ };
+    std::mt19937                         generator(1234);
+    std::uniform_real_distribution<real> distortion(-0.04, 0.04);
+    const int                            c_numDistortedConfigurations = 3;
+    for (int i = 0; i < c_numDistortedConfigurations; i++)
+    {
+        PaddedVector<RVec> xDistorted = x_;
+        for (RVec& xAtom : xDistorted)
+        {
+            for (int d = 0; d < DIM; d++)
+            {
+                xAtom[d] += distortion(generator);
+            }
+        }
+        configurations.push_back(xDistorted);
+    }
+
+    int configurationIndex = 0;
+    for (const PaddedVector<RVec>& x : configurations)
+    {
+        SCOPED_TRACE(formatString("Configuration %d", configurationIndex++));
+
+        const OutputQuantities output = testDerivativesMatchEnergy(x);
+
+        if (pbcType_ != PbcType::No)
+        {
+            SCOPED_TRACE("With atoms in different periodic images");
+
+            // Placing bonded atoms in different periodic images must not change
+            // energy or forces, but exercises the shift forces. No pair of
+            // atoms is separated by more than one box length along a dimension,
+            // as the kernels do not need to support that.
+            PaddedVector<RVec> xShifted = x;
+            xShifted[1][XX] -= box_[XX][XX];
+            xShifted[2][YY] += box_[YY][YY];
+            if (pbcType_ == PbcType::Xyz)
+            {
+                xShifted[3][ZZ] -= box_[ZZ][ZZ];
+            }
+            else
+            {
+                xShifted[3][XX] -= box_[XX][XX];
+                xShifted[3][YY] += box_[YY][YY];
+            }
+            const OutputQuantities outputShifted = testDerivativesMatchEnergy(xShifted);
+
+            const FloatingPointTolerance tolerance = relativeToleranceAsFloatingPoint(
+                    std::max(1.0, std::abs(static_cast<double>(output.energy))), 1e-10);
+            if (computeEnergy(flavor_))
+            {
+                EXPECT_REAL_EQ_TOL(output.energy, outputShifted.energy, tolerance);
+                EXPECT_REAL_EQ_TOL(output.dvdlambda, outputShifted.dvdlambda, tolerance);
+            }
+        }
+    }
+}
+
 //! Function types for testing bonds. Add new terms at the end.
 std::vector<iListInput> c_InputBonds = {
     { iListInput(2e-6F, 1e-8).setHarmonic(InteractionFunction::Bonds, 0.15, 500.0) },
@@ -501,7 +643,11 @@ std::vector<iListInput> c_InputBonds = {
     { iListInput().setCubic(0.16, 50.0, 2.0) },
     { iListInput(2e-6F, 1e-8).setMorse(0.15, 50.0, 2.0, 0.17, 40.0, 1.6) },
     { iListInput(2e-6F, 1e-8).setMorse(0.15, 30.0, 2.7) },
-    { iListInput().setFene(0.4, 5.0) }
+    { iListInput().setFene(0.4, 5.0) },
+    { iListInput(2e-6F, 1e-8).setHarmonic(InteractionFunction::HarmonicPotential, 0.15, 500.0) },
+    { iListInput(2e-6F, 1e-8).setHarmonic(InteractionFunction::HarmonicPotential, 0.15, 500.0, 0.17, 400.0) },
+    { iListInput(2e-6F, 1e-8).setRestraintBonds(0.1, 0.14, 0.16, 500.0) },
+    { iListInput(2e-6F, 1e-8).setRestraintBonds(0.1, 0.14, 0.16, 500.0, 0.11, 0.145, 0.165, 400.0) }
 };
 
 //! Constants for Quartic Angles
@@ -531,6 +677,9 @@ const real rbcB[NR_RBDIHS] = { -6.35, 12.6, 8.1, -10.7, 0.9, 15.4 };
 //! Constants for Ryckaert-Bellemans without FEP
 const real rbc[NR_RBDIHS] = { -7.35, 13.6, 8.4, -16.7, 1.3, 12.4 };
 
+//! Constants for combined bending-torsion
+const real cbtc[NR_CBTDIHS] = { 3.1, -2.2, 1.4, 0.7, -0.9, 0.5 };
+
 //! Function types for testing dihedrals. Add new terms at the end.
 std::vector<iListInput> c_InputDihs = {
     { iListInput(5e-4, 1e-8).setPDihedrals(InteractionFunction::ProperDihedrals, -100.0, 10.0, 2, -80.0, 20.0) },
@@ -538,7 +687,17 @@ std::vector<iListInput> c_InputDihs = {
     { iListInput(2e-4, 1e-8).setHarmonic(InteractionFunction::ImproperDihedrals, 100.0, 50.0) },
     { iListInput(2e-4, 1e-8).setHarmonic(InteractionFunction::ImproperDihedrals, 100.15, 50.0, 95.0, 30.0) },
     { iListInput(4e-4, 1e-8).setRbDihedrals(rbcA, rbcB) },
-    { iListInput(4e-4, 1e-8).setRbDihedrals(rbc) }
+    { iListInput(4e-4, 1e-8).setRbDihedrals(rbc) },
+    { iListInput(5e-4, 1e-8).setPDihedrals(InteractionFunction::PeriodicImproperDihedrals, -100.0, 10.0, 2, -80.0, 20.0) },
+    { iListInput(1e-4, 1e-8).setPDihedrals(InteractionFunction::PeriodicImproperDihedrals, -105.0, 15.0, 2) },
+    { iListInput(4e-4, 1e-8).setCbtDihedrals(cbtc) }
+};
+
+/*! \brief Function types for testing dihedrals that are singular for the trans conformation
+ *
+ * Add new terms at the end. */
+std::vector<iListInput> c_InputDihsNotTrans = {
+    { iListInput(4e-4, 1e-8).setPDihedrals(InteractionFunction::RestrictedTorsionPotential, -105.0, 15.0, 1) }
 };
 
 //! Function types for testing polarization. Add new terms at the end.
@@ -556,7 +715,9 @@ std::vector<iListInput> c_InputRestraints = {
     { iListInput(1e-4, 1e-8).setPDihedrals(InteractionFunction::AngleZAxisRestraints, -100.0, 10.0, 2, -80.0, 20.0) },
     { iListInput(1e-4, 1e-8).setPDihedrals(InteractionFunction::AngleZAxisRestraints, -105.0, 15.0, 2) },
     { iListInput(2e-3, 1e-8).setHarmonic(InteractionFunction::RestrictedBendingPotential, 100.0, 50.0) },
-    { iListInput(2e-3, 1e-8).setHarmonic(InteractionFunction::RestrictedBendingPotential, 100.0, 50.0, 110.0, 45.0) }
+    { iListInput(2e-3, 1e-8).setHarmonic(InteractionFunction::RestrictedBendingPotential, 100.0, 50.0, 110.0, 45.0) },
+    { iListInput(2e-4, 1e-8).setDihedralRestraints(-100.0, 10.0, 50.0) },
+    { iListInput(2e-4, 1e-8).setDihedralRestraints(-100.0, 10.0, 50.0, -80.0, 20.0, 60.0) }
 };
 
 //! Function types for testing bond with zero length, has zero reference length to make physical sense.
@@ -618,6 +779,13 @@ std::vector<PaddedVector<RVec>> c_coordinatesForTestsZeroAngle = {
     { { 0.005, 0.0, 0.1 }, { 0.0, 0.0, 0.0 }, { 0.005, 0.0, 0.1 }, { 0.5, 0.18, 0.22 } }
 };
 
+/*! \brief Coordinates for testing dihedrals that are singular for the trans conformation
+ *
+ * Butane with the last atom rotated to a gauche conformation. */
+std::vector<PaddedVector<RVec>> c_coordinatesForTestsGauche = {
+    { { 1.382, 1.573, 1.482 }, { 1.281, 1.559, 1.596 }, { 1.292, 1.422, 1.663 }, { 1.244, 1.311, 1.569 } }
+};
+
 //! PBC values for testing
 std::vector<PbcType> c_pbcForTests = { PbcType::No, PbcType::XY, PbcType::Xyz };
 
@@ -654,6 +822,17 @@ INSTANTIATE_TEST_SUITE_P(Dihedral,
                          ListedForcesTest,
                          ::testing::Combine(::testing::ValuesIn(c_InputDihs),
                                             ::testing::ValuesIn(c_coordinatesForTests),
+                                            ::testing::ValuesIn(c_pbcForTests),
+                                            ::testing::ValuesIn(c_lambdaValuesForTests),
+                                            ::testing::ValuesIn(c_flavorsForTests),
+                                            ::testing::ValuesIn(getHardwareContextsWithCapability(
+                                                    GpuConfigurationCapabilities::Bonded))),
+                         sc_testNamer);
+
+INSTANTIATE_TEST_SUITE_P(DihedralNotTrans,
+                         ListedForcesTest,
+                         ::testing::Combine(::testing::ValuesIn(c_InputDihsNotTrans),
+                                            ::testing::ValuesIn(c_coordinatesForTestsGauche),
                                             ::testing::ValuesIn(c_pbcForTests),
                                             ::testing::ValuesIn(c_lambdaValuesForTests),
                                             ::testing::ValuesIn(c_flavorsForTests),
