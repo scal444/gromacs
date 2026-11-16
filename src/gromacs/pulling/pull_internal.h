@@ -206,9 +206,12 @@ struct pull_coord_work_t
 /* Struct for storing vectorial forces for a pull coordinate */
 struct PullCoordVectorForces
 {
-    gmx::DVec force01; /* Force due to the pulling/constraining for groups 0, 1 */
-    gmx::DVec force23; /* Force for groups 2 and 3 */
-    gmx::DVec force45; /* Force for groups 4 and 5 */
+    /* Note that not all geometries with four or six groups set force23 and force45,
+     * so these need to be initialized to zero.
+     */
+    gmx::DVec force01 = { 0.0, 0.0, 0.0 }; /* Force due to the pulling/constraining for groups 0, 1 */
+    gmx::DVec force23 = { 0.0, 0.0, 0.0 }; /* Force for groups 2 and 3 */
+    gmx::DVec force45 = { 0.0, 0.0, 0.0 }; /* Force for groups 4 and 5 */
 };
 
 /* Struct for sums over (local) atoms in a pull group */
