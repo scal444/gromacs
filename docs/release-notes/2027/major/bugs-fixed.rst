@@ -116,3 +116,12 @@ The virial contribution of the Ewald dipole corrections used with
 :mdp:`epsilon-surface` or :mdp:`ewald-geometry` set to ``3dc``
 was divided by the box volume instead of multiplied by a half. Without
 perturbed charges it was also incorrectly scaled by one minus lambda.
+
+Correct dV/dlambda with Gapsys soft-core and potential-switched Van der Waals
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With the Gapsys soft-core function and a potential-switch modifier for
+Van der Waals interactions, the soft-core contribution to dV/dlambda was not
+multiplied by the switch function. This only affected pairs at distances
+that are both in the switching range and below the soft-core linearization
+point, which does not occur with commonly used settings.

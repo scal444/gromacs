@@ -1056,6 +1056,9 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                 }
                             }
 
+                            // The dV/dlambda contribution of the Gapsys soft-core, which
+                            // needs to be modified along with the potential
+                            KernelRealType gmx_unused dvdlVdwGapsys{ zero };
                             if constexpr (softcoreType == KernelSoftcoreType::Gapsys)
                             {
                                 lennardJonesQuadraticPotential<computeForces>(
@@ -1071,7 +1074,7 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                         dispersionShift,
                                         &scalarForcePerDistanceVdw[i],
                                         &vVdw[i],
-                                        &dvdlVdw,
+                                        &dvdlVdwGapsys,
                                         computeVdwInteraction);
                             }
 
@@ -1102,6 +1105,15 @@ static void nb_free_energy_kernel(const AtomPairlist&                    nlist,
                                             scalarForcePerDistanceVdw[i], vVdw[i], sw, rV, dsw, potSwitchMask);
                                 }
                                 vVdw[i] = potSwitchPotentialMod(vVdw[i], sw, potSwitchMask);
+                                if constexpr (softcoreType == KernelSoftcoreType::Gapsys)
+                                {
+                                    dvdlVdwGapsys =
+                                            potSwitchPotentialMod(dvdlVdwGapsys, sw, potSwitchMask);
+                                }
+                            }
+                            if constexpr (softcoreType == KernelSoftcoreType::Gapsys)
+                            {
+                                dvdlVdw = dvdlVdw + dvdlVdwGapsys;
                             }
 
                             vVdw[i] = selectByMask(vVdw[i], computeVdwInteraction);
