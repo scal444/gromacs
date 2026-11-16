@@ -150,7 +150,8 @@ static void pull_set_pbcatoms(const gmx::MpiComm& mpiComm, pull_t* pull, ArrayRe
 
 // Returns the reference location for PBC for computing the COM of a cylinder reference group
 static DVec getCylinderRefGroupPbcReference(const pull_coord_work_t&          coord,
-                                            ArrayRef<const pull_group_work_t> groups)
+                                            ArrayRef<const pull_group_work_t> groups,
+                                            const t_pbc&                      pbc)
 {
     GMX_ASSERT(coord.params_.eGeom == PullGroupGeometry::Cylinder, "Geometry should be cylinder");
 
@@ -159,7 +160,9 @@ static DVec getCylinderRefGroupPbcReference(const pull_coord_work_t&          co
      * of the cylinder group location, so we use that.
      *
      * With an external pull potential we do not have a reference distance. So then
-     * we use the COM of the whole reference group as the PBC reference.
+     * we use the location along the pull vector of the COM of the whole reference
+     * group. Note that the reference should be on the axis through the COM
+     * of the pull group, as it is also used as the center of the cylinder.
      */
     if (coord.params_.eType != PullingAlgorithm::External)
     {
@@ -168,7 +171,10 @@ static DVec getCylinderRefGroupPbcReference(const pull_coord_work_t&          co
     else
     {
         GMX_ASSERT(groups[coord.params_.group[0]].needToCalcCom, "We need the COM");
-        return groups[coord.params_.group[0]].x;
+        const DVec& xPullGroup = groups[coord.params_.group[1]].x;
+        DVec        dx;
+        pbc_dx_d(&pbc, xPullGroup, groups[coord.params_.group[0]].x, dx);
+        return xPullGroup - coord.spatialData.vec * coord.spatialData.vec.dot(dx);
     }
 }
 
@@ -224,7 +230,7 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
                 /* With rate=0, value_ref is set initially */
                 pcrd.value_ref = pcrd.params_.init + pcrd.params_.rate * t;
             }
-            const RVec pbcReference = getCylinderRefGroupPbcReference(pcrd, pull->group).toRVec();
+            const RVec pbcReference = getCylinderRefGroupPbcReference(pcrd, pull->group, pbc).toRVec();
 
             auto localAtomIndices = pref.atomSet_.localIndex();
 
@@ -368,7 +374,7 @@ static void make_cyl_refgrps(const gmx::MpiComm&  mpiComm,
              * to the atoms in the cylinder group.
              */
             const double axialComLocation = buffer[2] * dynamicGroup0.mwscale;
-            const DVec   pbcReference     = getCylinderRefGroupPbcReference(pcrd, pull->group);
+            const DVec   pbcReference     = getCylinderRefGroupPbcReference(pcrd, pull->group, pbc);
             dynamicGroup0.x               = pbcReference + axialComLocation * spatialData.vec;
             /* Note that this is a distance along the cylinder axis and not
              * the sum of the Cartesian components of the displacement,

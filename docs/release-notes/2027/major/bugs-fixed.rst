@@ -229,3 +229,14 @@ The contributions of the radial forces and of the radial offset
 of the cylinder group were missing. With a cylinder along z, this
 affected all elements of the virial, and thus the pressure,
 except for the zz element.
+
+Center the cylinder on the pull group with cylinder pulling and an external potential
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp-value:`pull-coord1-geometry=cylinder` combined with
+:mdp-value:`pull-coord1-type=external-potential`, e.g. when using AWH,
+the cylinder that selects and weights the atoms of the reference
+group was centered on the center of mass of the whole reference group
+instead of on the pull group. The pull coordinate value was therefore
+not the distance to the local part of the reference group and
+the radial forces did not match the coordinate.
