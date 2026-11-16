@@ -78,3 +78,11 @@ Correct dV/dlambda for perturbed angle restraints
 The contribution to dV/dlambda from perturbing the reference angle of
 angle restraints, with or without z-axis, had the wrong sign and lacked
 a factor of the multiplicity. Forces and energies were correct.
+
+Correct virial contribution of angle restraints across periodic boundaries
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The shift forces of angle restraints had the wrong sign. This led to
+an incorrect virial, and thus pressure, when the two atoms defining a
+restraint vector were in different periodic images. Forces and energies
+were correct.

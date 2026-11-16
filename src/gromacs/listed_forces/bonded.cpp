@@ -2394,12 +2394,14 @@ real low_angres(int             nbonds,
 
             if (computeVirial(flavor))
             {
-                rvec_inc(fshift[t1], f_i);
-                rvec_dec(fshift[c_centralShiftIndex], f_i);
+                // The shifts t1 and t2 apply to atoms j and l, which
+                // experience forces -f_i and -f_k, respectively.
+                rvec_dec(fshift[t1], f_i);
+                rvec_inc(fshift[c_centralShiftIndex], f_i);
                 if (!bZAxis)
                 {
-                    rvec_inc(fshift[t2], f_k);
-                    rvec_dec(fshift[c_centralShiftIndex], f_k);
+                    rvec_dec(fshift[t2], f_k);
+                    rvec_inc(fshift[c_centralShiftIndex], f_k);
                 }
             }
         }
