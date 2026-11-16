@@ -53,7 +53,6 @@
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/functions.h"
 #include "gromacs/utility/gmxassert.h"
-#include "gromacs/utility/mpicomm.h"
 #include "gromacs/utility/vec.h"
 
 /* There's nothing special to do here if just masses are perturbed,
@@ -67,7 +66,7 @@
  * undefined when LJ-PME is not active. This works because
  * bHaveChargeOrTypePerturbed handles the control flow. */
 void ewald_LRcorrection(const int                      numAtomsLocal,
-                        const gmx::MpiComm&            mpiComm,
+                        const bool                     isMainRank,
                         int                            numThreads,
                         int                            thread,
                         const real                     epsilonR,
@@ -179,8 +178,12 @@ void ewald_LRcorrection(const int                      numAtomsLocal,
         }
     }
 
-    /* Global corrections only on main process */
-    if (mpiComm.isMainRank() && thread == 0)
+    /* Energy and virial, only computed by one thread. Contributions that are
+     * sums over atoms are computed on all ranks for their local atoms, whereas
+     * the contributions that only depend on global properties are added
+     * only on the main rank.
+     */
+    if (thread == 0 && dipole_coeff != 0)
     {
         for (int q = 0; q < (bHaveChargePerturbed ? 2 : 1); q++)
         {
@@ -188,54 +191,76 @@ void ewald_LRcorrection(const int                      numAtomsLocal,
              * correction = dipole_coeff * ( (dipole)^2
              *              - qsum*sum_i q_i z_i^2 - qsum^2 * box_z^2 / 12 )
              */
-            if (dipole_coeff != 0)
+
+            // The virial is half the derivative of the energy with respect to
+            // strain. The energy is only weighted by lambda with perturbed charges.
+            const real lambdaFactor = (bHaveChargePerturbed ? (q == 0 ? L1_q : lambda_q) : 1);
+            const real factor       = 0.5_real * lambdaFactor;
+            matrix     virial       = { { 0 } };
+
+            if (isMainRank)
             {
                 if (ewaldGeometry == EwaldGeometry::ThreeD)
                 {
                     Vdipole[q] = dipole_coeff * iprod(mutot[q], mutot[q]);
+                    for (int d1 = 0; d1 < DIM; d1++)
+                    {
+                        for (int d2 = 0; d2 < DIM; d2++)
+                        {
+                            virial[d1][d2] += factor * 2 * dipole_coeff * mutot[q][d1] * mutot[q][d2];
+                        }
+                    }
                 }
                 else if (ewaldGeometry == EwaldGeometry::ThreeDC)
                 {
                     Vdipole[q] = dipole_coeff * mutot[q][ZZ] * mutot[q][ZZ];
-
                     if (chargecorr[q] != 0)
                     {
-                        /* Here we use a non thread-parallelized loop,
-                         * because this is the only loop over atoms for
-                         * energies and they need reduction (unlike forces).
-                         * We could implement a reduction over threads,
-                         * but this case is rarely used.
-                         */
-                        gmx::ArrayRef<const real> charge = (q == 0 ? chargeA : chargeB);
-                        real                      sumQZ2 = 0;
-                        for (int i = 0; i < numAtomsLocal; i++)
-                        {
-                            sumQZ2 += charge[i] * coords[i][ZZ] * coords[i][ZZ];
-                        }
-                        Vdipole[q] -= dipole_coeff * qsum[q]
-                                      * (sumQZ2 + qsum[q] * box[ZZ][ZZ] * box[ZZ][ZZ] / 12);
+                        Vdipole[q] -= dipole_coeff * qsum[q] * qsum[q] * box[ZZ][ZZ] * box[ZZ][ZZ] / 12;
+                    }
+                    // The forces only act along z
+                    for (int d = 0; d < DIM; d++)
+                    {
+                        virial[d][ZZ] += factor * 2 * dipole_coeff * mutot[q][d] * mutot[q][ZZ];
+                    }
+                    if (chargecorr[q] != 0)
+                    {
+                        virial[ZZ][ZZ] -= factor * 2 * dipole_coeff * qsum[q] * qsum[q]
+                                          * box[ZZ][ZZ] * box[ZZ][ZZ] / 12;
                     }
                 }
+            }
 
-                // The virial is half the derivative of the energy with respect to
-                // strain. The energy is only weighted by lambda with perturbed charges.
-                gmx::RVec  virial;
-                const real lambdaFactor = (bHaveChargePerturbed ? (q == 0 ? L1_q : lambda_q) : 1);
-                const real factor       = 0.5_real * lambdaFactor;
+            if (ewaldGeometry == EwaldGeometry::ThreeDC && chargecorr[q] != 0)
+            {
+                /* Here we use a non thread-parallelized loop,
+                 * because this is the only loop over atoms for
+                 * energies and they need reduction (unlike forces).
+                 * We could implement a reduction over threads,
+                 * but this case is rarely used.
+                 */
+                gmx::ArrayRef<const real> charge = (q == 0 ? chargeA : chargeB);
+                gmx::DVec                 sumQXZ = { 0, 0, 0 };
+                for (int i = 0; i < numAtomsLocal; i++)
+                {
+                    for (int d = 0; d < DIM; d++)
+                    {
+                        sumQXZ[d] += charge[i] * coords[i][d] * coords[i][ZZ];
+                    }
+                }
+                Vdipole[q] -= dipole_coeff * qsum[q] * sumQXZ[ZZ];
                 for (int d = 0; d < DIM; d++)
                 {
-                    virial[d] = -factor * Vdipole[q];
-                    if (ewaldGeometry == EwaldGeometry::ThreeD)
-                    {
-                        virial[d] += factor * 2 * dipole_coeff * gmx::square(mutot[q][d]);
-                    }
-                    else if (d == ZZ)
-                    {
-                        virial[d] += factor * 2 * Vdipole[q];
-                    }
+                    virial[d][ZZ] -= factor * 2 * dipole_coeff * qsum[q] * sumQXZ[d];
                 }
-                forceWithVirial->addVirialContribution(virial);
             }
+
+            // All contributions are inversely proportional to the volume
+            for (int d = 0; d < DIM; d++)
+            {
+                virial[d][d] -= factor * Vdipole[q];
+            }
+            forceWithVirial->addVirialContribution(virial);
         }
     }
     if (!bHaveChargePerturbed)

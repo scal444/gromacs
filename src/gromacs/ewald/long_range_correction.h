@@ -59,15 +59,19 @@ namespace gmx
 template<typename>
 class ArrayRef;
 class ForceWithVirial;
-class MpiComm;
 } // namespace gmx
 
 /*! \brief Calculate long-range Ewald correction terms.
  *
  * Calculate correction for electrostatic surface dipole terms.
+ *
+ * The energy and virial contributions that only depend on properties of
+ * the whole system are only added when \p isMainRank is true.
+ * The contributions that are sums over atoms are computed for
+ * the \p numAtomsLocal local atoms on each rank.
  */
 void ewald_LRcorrection(int                            numAtomsLocal,
-                        const gmx::MpiComm&            mpiComm,
+                        bool                           isMainRank,
                         int                            numThreads,
                         int                            thread,
                         real                           epsilonR,

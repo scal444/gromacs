@@ -60,7 +60,6 @@
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/enumerationhelpers.h"
-#include "gromacs/utility/mpicomm.h"
 #include "gromacs/utility/real.h"
 #include "gromacs/utility/stringutil.h"
 #include "gromacs/utility/vec.h"
@@ -118,12 +117,25 @@ public:
         real dvdlambda = 0;
         //! The forces
         std::vector<RVec> forces;
-        //! The diagonal of the virial
-        RVec virial;
+        //! The virial
+        matrix virial = { { 0 } };
     };
 
-    //! Computes the correction for coordinates \c x with \c box and \c lambda
-    Output computeCorrection(ArrayRef<const RVec> x, const matrix box, const real lambda)
+    /*! \brief Computes the correction for a rank with local atoms \c localAtoms
+     *
+     * \param[in] x           The coordinates of all atoms
+     * \param[in] box         The box
+     * \param[in] lambda      The value of lambda
+     * \param[in] localAtoms  The indices of the atoms that are local to the rank
+     * \param[in] isMainRank  Whether the rank is the main rank
+     *
+     * \returns the output, with the forces for the local atoms
+     */
+    Output computeCorrectionForRank(ArrayRef<const RVec> x,
+                                    const matrix         box,
+                                    const real           lambda,
+                                    ArrayRef<const int>  localAtoms,
+                                    const bool           isMainRank)
     {
         // The total dipole in Debye and total charge for states A and B
         std::array<RVec, 2>   dipole    = { RVec{ 0, 0, 0 }, RVec{ 0, 0, 0 } };
@@ -136,12 +148,22 @@ public:
             chargeSum[1] += chargeB_[i];
         }
 
+        std::vector<RVec> xLocal;
+        std::vector<real> chargeALocal;
+        std::vector<real> chargeBLocal;
+        for (const int atom : localAtoms)
+        {
+            xLocal.push_back(x[atom]);
+            chargeALocal.push_back(chargeA_[atom]);
+            chargeBLocal.push_back(chargeB_[atom]);
+        }
+
         Output output;
-        output.forces.resize(x.size(), { 0.0_real, 0.0_real, 0.0_real });
+        output.forces.resize(xLocal.size(), { 0.0_real, 0.0_real, 0.0_real });
         ForceWithVirial forceWithVirial(output.forces, true);
 
-        ewald_LRcorrection(x.size(),
-                           MpiComm(MpiComm::SingleRank{}),
+        ewald_LRcorrection(xLocal.size(),
+                           isMainRank,
                            1,
                            0,
                            c_epsilonR,
@@ -150,10 +172,10 @@ public:
                            c_epsilonSurface,
                            haveWalls_,
                            c_wallEwaldZFactor,
-                           chargeA_,
-                           chargeB_,
+                           chargeALocal,
+                           chargeBLocal,
                            havePerturbedCharges_,
-                           x,
+                           xLocal,
                            box,
                            dipole,
                            &forceWithVirial,
@@ -161,12 +183,17 @@ public:
                            lambda,
                            &output.dvdlambda);
 
-        for (int d = 0; d < DIM; d++)
-        {
-            output.virial[d] = forceWithVirial.getVirial()[d][d];
-        }
+        copy_mat(forceWithVirial.getVirial(), output.virial);
 
         return output;
+    }
+
+    //! Computes the correction for coordinates \c x with \c box and \c lambda
+    Output computeCorrection(ArrayRef<const RVec> x, const matrix box, const real lambda)
+    {
+        std::vector<int> allAtoms(x.size());
+        std::iota(allAtoms.begin(), allAtoms.end(), 0);
+        return computeCorrectionForRank(x, box, lambda, allAtoms, true);
     }
 
 protected:
@@ -231,16 +258,80 @@ TEST_P(LongRangeCorrectionTest, DerivativesMatchEnergy)
                                                  return computeCorrection(xTrial, boxTrial, lambda_).energy;
                                              },
                                              settings.strainStep);
-        EXPECT_REAL_EQ_TOL(output.virial[d],
+        EXPECT_REAL_EQ_TOL(output.virial[d][d],
                            numericalVirial,
                            finiteDifferenceTolerance(
-                                   std::max(1.0, std::abs(static_cast<double>(output.virial[d]))),
+                                   std::max(1.0, std::abs(static_cast<double>(output.virial[d][d]))),
                                    settings.relativeTolerance,
                                    std::abs(output.energy),
                                    settings.strainStep))
                 << "Virial does not match the derivative of the energy with respect to scaling "
                    "dimension "
                 << d;
+    }
+}
+
+/*! \brief Checks the off-diagonal elements of the virial
+ *
+ * As the volume does not change with shear, these should be equal to
+ * the single sum virial -0.5 sum_i x_i (x) f_i.
+ */
+TEST_P(LongRangeCorrectionTest, OffDiagonalVirialMatchesForces)
+{
+    const Output output = computeCorrection(x_, box_, lambda_);
+
+    const FloatingPointTolerance tolerance =
+            relativeToleranceAsFloatingPoint(10.0, GMX_DOUBLE ? 1e-12 : 1e-5);
+    for (int d1 = 0; d1 < DIM; d1++)
+    {
+        for (int d2 = 0; d2 < DIM; d2++)
+        {
+            if (d1 == d2)
+            {
+                continue;
+            }
+            real expectedVirial = 0;
+            for (Index i = 0; i < gmx::ssize(x_); i++)
+            {
+                expectedVirial -= 0.5_real * x_[i][d1] * output.forces[i][d2];
+            }
+            EXPECT_REAL_EQ_TOL(output.virial[d1][d2], expectedVirial, tolerance)
+                    << "for virial element " << d1 << "," << d2;
+        }
+    }
+}
+
+/*! \brief Checks that the contributions of two ranks add up to those of a single rank
+ *
+ * With domain decomposition each rank only has access to its local atoms.
+ */
+TEST_P(LongRangeCorrectionTest, ContributionsOfRanksAddUp)
+{
+    const Output output = computeCorrection(x_, box_, lambda_);
+
+    const std::vector<int> atomsMainRank  = { 0, 2 };
+    const std::vector<int> atomsOtherRank = { 1, 3 };
+    const Output outputMainRank = computeCorrectionForRank(x_, box_, lambda_, atomsMainRank, true);
+    const Output outputOtherRank = computeCorrectionForRank(x_, box_, lambda_, atomsOtherRank, false);
+
+    const FloatingPointTolerance tolerance =
+            relativeToleranceAsFloatingPoint(10.0, GMX_DOUBLE ? 1e-12 : 1e-5);
+    EXPECT_REAL_EQ_TOL(output.energy, outputMainRank.energy + outputOtherRank.energy, tolerance);
+    EXPECT_REAL_EQ_TOL(output.dvdlambda, outputMainRank.dvdlambda + outputOtherRank.dvdlambda, tolerance);
+    for (int d1 = 0; d1 < DIM; d1++)
+    {
+        for (int d2 = 0; d2 < DIM; d2++)
+        {
+            EXPECT_REAL_EQ_TOL(output.virial[d1][d2],
+                               outputMainRank.virial[d1][d2] + outputOtherRank.virial[d1][d2],
+                               tolerance)
+                    << "for virial element " << d1 << "," << d2;
+        }
+    }
+    for (Index i = 0; i < gmx::ssize(atomsMainRank); i++)
+    {
+        EXPECT_REAL_EQ_TOL(norm(output.forces[atomsMainRank[i]] - outputMainRank.forces[i]), 0, tolerance);
+        EXPECT_REAL_EQ_TOL(norm(output.forces[atomsOtherRank[i]] - outputOtherRank.forces[i]), 0, tolerance);
     }
 }
 

@@ -207,7 +207,7 @@ void CpuPpLongRangeNonbondeds::calculate(gmx_pme_t*                     pmedata,
                          */
                         ewald_LRcorrection(
                                 numHomeAtoms_,
-                                commrec->commMyGroup,
+                                commrec->commMyGroup.isMainRank(),
                                 nthreads,
                                 t,
                                 epsilonR_,

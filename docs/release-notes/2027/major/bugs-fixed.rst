@@ -125,3 +125,19 @@ Van der Waals interactions, the soft-core contribution to dV/dlambda was not
 multiplied by the switch function. This only affected pairs at distances
 that are both in the switching range and below the soft-core linearization
 point, which does not occur with commonly used settings.
+
+Correct the Ewald 3DC energy for systems with net charge with domain decomposition
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp:`ewald-geometry` set to ``3dc`` and a system with net charge,
+the energy correction for the net charge, and the corresponding dV/dlambda,
+only included the atoms that are local to the main rank when running with
+domain decomposition over multiple ranks. Forces were correct.
+
+Add missing off-diagonal virial for Ewald surface and 3DC corrections
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The virial contribution of the Ewald dipole corrections used with
+:mdp:`epsilon-surface` or :mdp:`ewald-geometry` set to ``3dc``
+lacked the off-diagonal elements, which affected the off-diagonal
+elements of the pressure tensor.
