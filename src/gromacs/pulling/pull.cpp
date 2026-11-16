@@ -417,7 +417,8 @@ real max_pull_distance2(const pull_coord_work_t& pcrd, const t_pbc& pbc)
  * \param[in]  groupIndex0  The index of group 0 in the pcrd->params.group
  * \param[in]  groupIndex1  The index of group 1 in the pcrd->params.group
  * \param[in]  max_dist2    The maximum distance squared
- * \param[out] dr           The distance vector
+ * \param[out] drAllDims    The distance vector including dimensions that are not selected for pulling, can be nullptr
+ * \returns the distance vector with only the dimensions selected for pulling
  */
 static DVec low_get_pull_coord_dr(const pull_t&            pull,
                                   const pull_coord_work_t& pcrd,
@@ -426,7 +427,8 @@ static DVec low_get_pull_coord_dr(const pull_t&            pull,
                                   const DVec&              xref,
                                   const int                groupIndex0,
                                   const int                groupIndex1,
-                                  const double             max_dist2)
+                                  const double             max_dist2,
+                                  DVec*                    drAllDims)
 {
     const pull_group_work_t& pgrp0 = pull.group[pcrd.params_.group[0]];
 
@@ -445,7 +447,10 @@ static DVec low_get_pull_coord_dr(const pull_t&            pull,
 
     DVec dr;
     pbc_dx_d(&pbc, xg, xrefr, *reinterpret_cast<dvec*>(&dr));
-
+    if (drAllDims != nullptr)
+    {
+        *drAllDims = dr;
+    }
 
     bool   directional = pull_coordinate_is_directional(pcrd.params_);
     double dr2         = 0;
@@ -555,21 +560,24 @@ static void get_pull_coord_dr(const pull_t& pull, pull_coord_work_t* pcrd, const
             pcrd->params_.eGeom == PullGroupGeometry::Cylinder ? pcrd->dynamicGroup0->x : pgrp0.x,
             0,
             1,
-            md2);
+            md2,
+            &spatialData.dr01AllDims);
 
     if (pcrd->params_.ngroup >= 4)
     {
         const pull_group_work_t& pgrp2 = pull.group[pcrd->params_.group[2]];
         const pull_group_work_t& pgrp3 = pull.group[pcrd->params_.group[3]];
 
-        spatialData.dr23 = low_get_pull_coord_dr(pull, *pcrd, pbc, pgrp3.x, pgrp2.x, 2, 3, md2);
+        spatialData.dr23 = low_get_pull_coord_dr(
+                pull, *pcrd, pbc, pgrp3.x, pgrp2.x, 2, 3, md2, &spatialData.dr23AllDims);
     }
     if (pcrd->params_.ngroup >= 6)
     {
         const pull_group_work_t& pgrp4 = pull.group[pcrd->params_.group[4]];
         const pull_group_work_t& pgrp5 = pull.group[pcrd->params_.group[5]];
 
-        spatialData.dr45 = low_get_pull_coord_dr(pull, *pcrd, pbc, pgrp5.x, pgrp4.x, 4, 5, md2);
+        spatialData.dr45 = low_get_pull_coord_dr(
+                pull, *pcrd, pbc, pgrp5.x, pgrp4.x, 4, 5, md2, &spatialData.dr45AllDims);
     }
 }
 
@@ -878,7 +886,7 @@ static void do_constraint(struct pull_t* pull,
 
             /* Get the current difference vector */
             DVec unc_ij = low_get_pull_coord_dr(
-                    *pull, *pcrd, pbc, rnew[pcrd->params_.group[1]], rnew[pcrd->params_.group[0]], 0, 1, -1);
+                    *pull, *pcrd, pbc, rnew[pcrd->params_.group[1]], rnew[pcrd->params_.group[0]], 0, 1, -1, nullptr);
 
             if (debug)
             {
@@ -966,8 +974,9 @@ static void do_constraint(struct pull_t* pull,
 
                 g0 = pcrd->params_.group[0];
                 g1 = pcrd->params_.group[1];
-                const DVec tmp = low_get_pull_coord_dr(*pull, *pcrd, pbc, rnew[g1], rnew[g0], 0, 1, -1);
-                const DVec tmp3 = low_get_pull_coord_dr(*pull, *pcrd, pbc, dr1, dr0, 0, 1, -1);
+                const DVec tmp =
+                        low_get_pull_coord_dr(*pull, *pcrd, pbc, rnew[g1], rnew[g0], 0, 1, -1, nullptr);
+                const DVec tmp3 = low_get_pull_coord_dr(*pull, *pcrd, pbc, dr1, dr0, 0, 1, -1, nullptr);
                 fprintf(debug,
                         "Pull cur %8.5f %8.5f %8.5f j:%8.5f %8.5f %8.5f d: %8.5f\n",
                         rnew[g0][0],
@@ -1011,7 +1020,7 @@ static void do_constraint(struct pull_t* pull,
             }
 
             DVec unc_ij = low_get_pull_coord_dr(
-                    *pull, coord, pbc, rnew[coord.params_.group[1]], rnew[coord.params_.group[0]], 0, 1, -1);
+                    *pull, coord, pbc, rnew[coord.params_.group[1]], rnew[coord.params_.group[0]], 0, 1, -1, nullptr);
 
             switch (coord.params_.eGeom)
             {
@@ -1140,13 +1149,19 @@ static void do_constraint(struct pull_t* pull,
     }
 }
 
+/* Adds the virial contribution -0.5 * dr (x) f for a force f on a group
+ * and -f on a group at distance vector -dr from the first group.
+ *
+ * Note that the force is not necessarily parallel to the distance vector,
+ * so the order of the indices matters.
+ */
 static void add_virial_coord_dr(tensor vir, const DVec& dr, const DVec& f)
 {
     for (int j = 0; j < DIM; j++)
     {
         for (int m = 0; m < DIM; m++)
         {
-            vir[j][m] -= 0.5 * f[j] * dr[m];
+            vir[j][m] -= 0.5 * dr[j] * f[m];
         }
     }
 }
@@ -1156,15 +1171,20 @@ static void add_virial_coord(tensor vir, const pull_coord_work_t& pcrd, const Pu
 {
     if (vir != nullptr && pcrd.params_.eGeom != PullGroupGeometry::DirectionPBC)
     {
-        /* Add the pull contribution for each distance vector to the virial. */
-        add_virial_coord_dr(vir, pcrd.spatialData.dr01, forces.force01);
+        /* Add the pull contribution for each distance vector to the virial.
+         * The forces only have components along the dimensions selected
+         * for pulling, but they do work for a deformation that displaces
+         * the groups along those dimensions proportional to their distance
+         * along the other dimensions, so we need the complete distance vectors.
+         */
+        add_virial_coord_dr(vir, pcrd.spatialData.dr01AllDims, forces.force01);
         if (pcrd.params_.ngroup >= 4)
         {
-            add_virial_coord_dr(vir, pcrd.spatialData.dr23, forces.force23);
+            add_virial_coord_dr(vir, pcrd.spatialData.dr23AllDims, forces.force23);
         }
         if (pcrd.params_.ngroup >= 6)
         {
-            add_virial_coord_dr(vir, pcrd.spatialData.dr45, forces.force45);
+            add_virial_coord_dr(vir, pcrd.spatialData.dr45AllDims, forces.force45);
         }
     }
 }

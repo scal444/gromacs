@@ -150,9 +150,15 @@ struct pull_group_work_t
 /* Struct describing the instantaneous spatial layout of a pull coordinate */
 struct PullCoordSpatialData
 {
-    gmx::DVec dr01;       /* The direction vector of group 1 relative to group 0 */
-    gmx::DVec dr23;       /* The direction vector of group 3 relative to group 2 */
-    gmx::DVec dr45;       /* The direction vector of group 5 relative to group 4 */
+    gmx::DVec dr01; /* The direction vector of group 1 relative to group 0 */
+    gmx::DVec dr23; /* The direction vector of group 3 relative to group 2 */
+    gmx::DVec dr45; /* The direction vector of group 5 relative to group 4 */
+    /* The distance vectors including the dimensions that are not selected
+     * for pulling, needed for the virial
+     */
+    gmx::DVec dr01AllDims = { 0.0, 0.0, 0.0 };
+    gmx::DVec dr23AllDims = { 0.0, 0.0, 0.0 };
+    gmx::DVec dr45AllDims = { 0.0, 0.0, 0.0 };
     gmx::DVec vec;        /* The pull direction */
     double    vec_len;    /* Length of vec for direction-relative */
     gmx::DVec ffrad;      /* conversion factor from vec to radial force */

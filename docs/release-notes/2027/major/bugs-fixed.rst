@@ -206,3 +206,15 @@ With :mdp-value:`pull-coord1-geometry=direction-relative`, the forces
 on the two pull groups that define the pull direction were not included
 in the virial. This led to an incorrect pressure, although the trace
 of the pressure tensor was not affected.
+
+Correct off-diagonal virial elements of pull forces
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The off-diagonal elements of the virial contribution of COM pulling
+with a potential were transposed, which matters for pull geometries
+direction and angle-axis, where the pull force is not parallel to
+the distance vector between the groups. Furthermore, off-diagonal
+elements were missing when pulling was not applied in all dimensions.
+This affected the off-diagonal elements of the pressure tensor. The
+diagonal elements, and thus simulations with isotropic or semi-isotropic
+pressure coupling or a rectangular box, were not affected.
