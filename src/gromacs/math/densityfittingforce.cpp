@@ -113,10 +113,10 @@ RVec DensityFittingForce::Impl::evaluateForce(const GaussianSpreadKernelParamete
 
     for (int dimension = XX; dimension <= ZZ; ++dimension)
     {
-        // multiply with amplitude so that Gauss3D = (amplitude * Gauss_x) * Gauss_y * Gauss_z
-        const float gauss1DAmplitude = dimension > XX ? 1.0 : localParameters.amplitude_;
+        // Spread with unit amplitude, the force is multiplied by the amplitude
+        // below. The density is linear in the amplitude, and thus so is the force.
         gauss1d_[dimension].spread(
-                gauss1DAmplitude, localParameters.coordinate_[dimension] - closestLatticePoint[dimension]);
+                1.0, localParameters.coordinate_[dimension] - closestLatticePoint[dimension]);
     }
 
     const auto spreadZY = outerProductZY_(gauss1d_[ZZ].view(), gauss1d_[YY].view());

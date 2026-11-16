@@ -136,6 +136,29 @@ TEST(DensityFittingForce, pullsTowardsDerivative)
     EXPECT_FLOAT_EQ(expected, result[ZZ]);
 }
 
+TEST(DensityFittingForce, isLinearInAmplitude)
+{
+    const float sigma      = 1;
+    const float nSigma     = 5;
+    const RVec  gridCenter = { 1, 1, 1 };
+    const float amplitude  = 0.25;
+
+    DensityFittingForce forceEvaluator({ { sigma, sigma, sigma }, nSigma });
+    MultiDimArray<std::vector<float>, dynamicExtents3D> densityDerivative(3, 3, 3);
+    std::fill(begin(densityDerivative), end(densityDerivative), 0);
+    densityDerivative(0, 0, 0) = 1;
+
+    const RVec result =
+            forceEvaluator.evaluateForce({ gridCenter, amplitude }, densityDerivative.asConstView());
+    // The density is proportional to the amplitude and thus so is the force
+    real expected = -amplitude / std::sqrt(2 * 2 * 2 * M_PI * M_PI * M_PI) * std::exp(-0.5)
+                    * std::exp(-0.5) * std::exp(-0.5);
+
+    EXPECT_FLOAT_EQ(expected, result[XX]);
+    EXPECT_FLOAT_EQ(expected, result[YY]);
+    EXPECT_FLOAT_EQ(expected, result[ZZ]);
+}
+
 } // namespace
 
 } // namespace test

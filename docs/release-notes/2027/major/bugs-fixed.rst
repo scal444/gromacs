@@ -240,3 +240,17 @@ group was centered on the center of mass of the whole reference group
 instead of on the pull group. The pull coordinate value was therefore
 not the distance to the local part of the reference group and
 the radial forces did not match the coordinate.
+Correct density-guided simulation forces with non-unit amplitudes
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The density-guided simulation force on an atom was multiplied twice by
+the amplitude with which the atom is spread on the density grid. With
+:mdp:`density-guided-simulation-normalize-densities` set to ``yes``,
+which is the default, and unit amplitudes, the amplitude is one over
+the number of fitted atoms, so the forces were too small by that factor
+compared to the reported energy. With mass or charge as amplitude, the
+force on each atom was additionally scaled by its (normalized) mass
+or charge. Energies were correct. Note that, to obtain the same forces
+as before with unit amplitudes and normalization,
+:mdp:`density-guided-simulation-force-constant` needs to be divided by
+the number of atoms in the fitting group.
