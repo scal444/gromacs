@@ -49,6 +49,7 @@ gmx_add_unit_test(EwaldUnitTests ewald-test
         pmesolvetest.cpp
         pmesplinespreadtest.cpp
         pme.cpp
+        long_range_correction.cpp
     GPU_CPP_SOURCE_FILES
         pmetestcommon.cpp
 )

@@ -217,8 +217,11 @@ void ewald_LRcorrection(const int                      numAtomsLocal,
                     }
                 }
 
+                // The virial is half the derivative of the energy with respect to
+                // strain. The energy is only weighted by lambda with perturbed charges.
                 gmx::RVec  virial;
-                const real factor = (q == 0 ? L1_q : lambda_q) / boxVolume;
+                const real lambdaFactor = (bHaveChargePerturbed ? (q == 0 ? L1_q : lambda_q) : 1);
+                const real factor       = 0.5_real * lambdaFactor;
                 for (int d = 0; d < DIM; d++)
                 {
                     virial[d] = -factor * Vdipole[q];

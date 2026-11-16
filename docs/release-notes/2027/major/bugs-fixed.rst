@@ -108,3 +108,11 @@ Correct forces with Ewald geometry 3DC, net charge and perturbed charges
 With :mdp:`ewald-geometry` set to ``3dc``, a system with net charge and
 perturbed charges, the force correction for the net charge in the B state
 was not multiplied by the B-state charge of the atom.
+
+Correct the virial of the Ewald surface and 3DC corrections
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The virial contribution of the Ewald dipole corrections used with
+:mdp:`epsilon-surface` or :mdp:`ewald-geometry` set to ``3dc``
+was divided by the box volume instead of multiplied by a half. Without
+perturbed charges it was also incorrectly scaled by one minus lambda.
