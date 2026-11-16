@@ -275,3 +275,13 @@ the square root of the mass of the atom. The forces were thus not
 consistent with the flooding energy, also for harmonic restraints and
 constant-force flooding. Flooding with eigenvectors from an analysis
 without mass weighting was not affected.
+
+Correct periodic image selection for density-guided simulation with non-cubic densities
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With periodic boundary conditions, atoms are placed in the periodic image
+closest to the center of the reference density. The center was computed
+with the number of voxels along x and z interchanged. With reference densities
+with different extents along x and z, in boxes not much larger than the
+density, atoms could be placed in a periodic image outside the density, where
+they do not contribute to the similarity and experience no force.

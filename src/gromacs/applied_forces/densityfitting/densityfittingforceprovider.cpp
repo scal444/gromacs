@@ -255,9 +255,10 @@ DensityFittingForceProvider::Impl::Impl(const DensityFittingParameters& paramete
         affineTransformation_.emplace(translationMatrix, translationVector);
     }
 
-    referenceDensityCenter_ = { real(referenceDensity.extent(XX)) / 2,
+    // Note that the density is indexed as (z, y, x)
+    referenceDensityCenter_ = { real(referenceDensity.extent(ZZ)) / 2,
                                 real(referenceDensity.extent(YY)) / 2,
-                                real(referenceDensity.extent(ZZ)) / 2 };
+                                real(referenceDensity.extent(XX)) / 2 };
     transformationToDensityLattice_.scaleOperationOnly().inverseIgnoringZeroScale(&referenceDensityCenter_);
     // correct the reference density center for a shift
     // if the reference density does not have its origin at (0,0,0)

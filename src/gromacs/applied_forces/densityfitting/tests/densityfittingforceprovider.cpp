@@ -274,6 +274,90 @@ TEST_P(DensityFittingForceTest, ForcesMatchEnergy)
             c_x, output.forces, [&](ArrayRef<const RVec> xTrial) { return compute(xTrial).energy; }, settings);
 }
 
+/*! \brief Checks that atoms are put in the periodic image closest to the center of the density
+ *
+ * Uses a density lattice that is much longer along x than along y and z,
+ * with an atom close to the far end along x. With PBC that atom should
+ * not be moved to another periodic image, so the result should be the same
+ * as without PBC.
+ */
+TEST(DensityFittingForceProviderTest, UsesCenterOfNonCubicDensityForPbc)
+{
+    const IVec latticeExtent  = { 40, 8, 8 };
+    const real latticeSpacing = 0.1;
+    // Note that x is the last index
+    MultiDimArray<std::vector<float>, dynamicExtents3D> referenceDensity(
+            latticeExtent[ZZ], latticeExtent[YY], latticeExtent[XX]);
+    for (int z = 0; z < latticeExtent[ZZ]; z++)
+    {
+        for (int y = 0; y < latticeExtent[YY]; y++)
+        {
+            for (int x = 0; x < latticeExtent[XX]; x++)
+            {
+                referenceDensity(z, y, x) = 1 + 0.1 * x + 0.2 * y + 0.3 * z;
+            }
+        }
+    }
+
+    DensityFittingParameters parameters;
+    parameters.active_                          = true;
+    parameters.indices_                         = { 0 };
+    parameters.similarityMeasureMethod_         = DensitySimilarityMeasureMethod::innerProduct;
+    parameters.amplitudeLookupMethod_           = DensityFittingAmplitudeMethod::Unity;
+    parameters.normalizeDensities_              = false;
+    parameters.adaptiveForceScaling_            = false;
+    parameters.forceConstant_                   = 1e3;
+    parameters.gaussianTransformSpreadingWidth_ = 0.2;
+    parameters.gaussianTransformSpreadingRangeInMultiplesOfWidth_ = 4.0;
+    parameters.calculationIntervalInSteps_                        = 1;
+
+    // The atom is 1.6 nm from the center of the density along x
+    const std::vector<RVec> x       = { { 3.6, 0.4, 0.4 } };
+    const std::vector<real> charges = { 0 };
+    const std::vector<real> masses  = { 1 };
+    matrix                  box     = { { 4.5, 0, 0 }, { 0, 4.5, 0 }, { 0, 0, 4.5 } };
+
+    MpiComm             mpiComm{ MpiComm::SingleRank{} };
+    LocalAtomSetManager atomSets;
+    LocalAtomSet        localAtomSet = atomSets.add(parameters.indices_);
+
+    auto compute = [&](const PbcType pbcType)
+    {
+        DensityFittingForceProviderState state;
+        const RVec latticeScale = { 1 / latticeSpacing, 1 / latticeSpacing, 1 / latticeSpacing };
+        DensityFittingForceProvider forceProvider(parameters,
+                                                  referenceDensity.asConstView(),
+                                                  TranslateAndScale(latticeScale, { 0, 0, 0 }),
+                                                  localAtomSet,
+                                                  pbcType,
+                                                  0.002,
+                                                  state);
+
+        ForceProviderInput forceProviderInput(
+                x, gmx::ssize(x), charges, masses, 0.0, 0, box, mpiComm, nullptr);
+
+        std::vector<RVec>   forces(x.size(), { 0.0_real, 0.0_real, 0.0_real });
+        ForceWithVirial     forceWithVirial(forces, false);
+        gmx_enerdata_t      enerd(1, nullptr);
+        ForceProviderOutput forceProviderOutput(&forceWithVirial, &enerd);
+
+        forceProvider.calculateForces(forceProviderInput, &forceProviderOutput);
+
+        return std::make_pair(enerd.term[InteractionFunction::DensityFitting], forces[0]);
+    };
+
+    const auto [energyWithoutPbc, forceWithoutPbc] = compute(PbcType::No);
+    const auto [energyWithPbc, forceWithPbc]       = compute(PbcType::Xyz);
+
+    // Check that the atom actually overlaps with the density
+    EXPECT_LT(energyWithoutPbc, -1);
+    EXPECT_REAL_EQ(energyWithoutPbc, energyWithPbc);
+    for (int d = 0; d < DIM; d++)
+    {
+        EXPECT_REAL_EQ(forceWithoutPbc[d], forceWithPbc[d]);
+    }
+}
+
 //! Returns a name for a test with parameters \c info
 std::string nameOfTest(const ::testing::TestParamInfo<DensityFittingForceTestParameters>& info)
 {
