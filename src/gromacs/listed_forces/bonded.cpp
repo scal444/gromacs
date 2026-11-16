@@ -3507,14 +3507,16 @@ real g96bonds(int             nbonds,
         ki  = pbc_rvec_sub(pbc, x[ai], x[aj], dx); /*   3      */
         dr2 = iprod(dx, dx);                       /*   5		*/
 
-        *dvdlambda += g96harmonic(forceparams[type].harmonic.krA,
-                                  forceparams[type].harmonic.krB,
-                                  forceparams[type].harmonic.rA,
-                                  forceparams[type].harmonic.rB,
-                                  dr2,
-                                  lambda,
-                                  &vbond,
-                                  &fbond);
+        // The potential is half of that returned by g96harmonic(), and so is dV/dlambda
+        *dvdlambda += 0.5
+                      * g96harmonic(forceparams[type].harmonic.krA,
+                                    forceparams[type].harmonic.krB,
+                                    forceparams[type].harmonic.rA,
+                                    forceparams[type].harmonic.rB,
+                                    dr2,
+                                    lambda,
+                                    &vbond,
+                                    &fbond);
 
         vtot += 0.5 * vbond; /* 1*/
 

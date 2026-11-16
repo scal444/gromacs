@@ -3,7 +3,7 @@
 <ReferenceData>
   <FunctionType Name="G96BONDS">
     <Real Name="Epot ">0.60119176217500003</Real>
-    <Real Name="dVdlambda ">0.1393732951300003</Real>
+    <Real Name="dVdlambda ">0.069686647565000148</Real>
     <Sequence Name="Forces">
       <Int Name="Length">4</Int>
       <Vector>

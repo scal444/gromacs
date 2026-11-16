@@ -57,3 +57,11 @@ Below are issues fixed in the (`Colvars <https://colvars.github.io>`_) library (
 
 - Improved restart consistency and fixes for multi-replica well-tempered metadynamics (Colvars repo pull request `820 <https://github.com/Colvars/colvars/pull/820>`_)
 - Fixed wrapping of extended-system variable coupled to orientationAngle (Colvars repo pull request `943 <https://github.com/Colvars/colvars/pull/943>`_)
+
+Correct dV/dlambda for perturbed GROMOS-96 bonds
+""""""""""""""""""""""""""""""""""""""""""""""""
+
+The derivative of the potential energy with respect to lambda for
+perturbed GROMOS-96 (quartic) bonds was a factor of two too large. Forces and
+energies were correct. Free-energy differences computed from dH/dlambda
+or its derived quantities with such bonds perturbed were affected.
