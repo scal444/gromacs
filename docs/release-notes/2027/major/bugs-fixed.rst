@@ -152,3 +152,13 @@ the box volume in cubic nanometers. The error in the pressure is
 proportional to the square of the net charge divided by the square of
 the volume, so it mainly affected small systems with a large net charge.
 The energy and forces were correct.
+
+Correct the Ewald correction for net charge with walls
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With two walls and :mdp:`pbc` set to ``xy``, the Ewald unit cell is
+elongated along z by :mdp:`wall-ewald-zfac`, but the energy correction for
+systems with net charge used the volume of the simulation box. The
+correction, its contribution to dV/dlambda when the net charge is
+perturbed and its virial were thus a factor :mdp:`wall-ewald-zfac` too
+large. Forces were correct.

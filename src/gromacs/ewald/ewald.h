@@ -119,6 +119,8 @@ real do_ewald(bool                           havePbcXY2Walls,
  *
  * Should only be called on one thread. */
 real ewald_charge_correction(const gmx_domdec_t*         dd,
+                             bool                        havePbcXY2Walls,
+                             real                        wallEwaldZfac,
                              real                        epsilonR,
                              real                        ewaldcoeffQ,
                              gmx::ArrayRef<const double> qsum,

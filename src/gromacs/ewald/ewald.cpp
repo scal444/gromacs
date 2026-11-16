@@ -310,6 +310,8 @@ real do_ewald(bool                           havePbcXY2Walls,
 }
 
 real ewald_charge_correction(const gmx_domdec_t*         dd,
+                             const bool                  havePbcXY2Walls,
+                             const real                  wallEwaldZfac,
                              const real                  epsilonR,
                              const real                  ewaldcoeffQ,
                              gmx::ArrayRef<const double> qsum,
@@ -323,8 +325,15 @@ real ewald_charge_correction(const gmx_domdec_t*         dd,
 
     if (dd == nullptr || DDMAIN(dd))
     {
-        /* Apply charge correction */
-        real vol = box[XX][XX] * box[YY][YY] * box[ZZ][ZZ];
+        /* Apply charge correction.
+         * The background charge is spread over the Ewald unit cell,
+         * which is elongated along z when using walls.
+         */
+        matrix          scaledBox;
+        EwaldBoxZScaler boxScaler(havePbcXY2Walls, wallEwaldZfac);
+        boxScaler.scaleBox(box, scaledBox);
+
+        real vol = scaledBox[XX][XX] * scaledBox[YY][YY] * scaledBox[ZZ][ZZ];
 
         real fac = M_PI * gmx::c_one4PiEps0 / (epsilonR * 2.0 * vol * vol * gmx::square(ewaldcoeffQ));
 

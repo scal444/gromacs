@@ -35,6 +35,7 @@
  * \brief
  * Tests that forces, virial and dV/dlambda of the plain Ewald reciprocal
  * sum and the net-charge correction are consistent with the energy
+ * and that the total Ewald energy does not depend on the Ewald coefficient
  *
  * \author Kevin Boyd <kevin44boyd@gmail.com>
  * \ingroup module_ewald
@@ -80,6 +81,8 @@ namespace
 constexpr real c_epsilonR = 1.5;
 //! The Ewald splitting parameter
 constexpr real c_ewaldCoefficient = 2.5;
+//! The scaling factor for the box along z with walls
+constexpr real c_wallEwaldZFactor = 3;
 
 //! Test parameters: whether charges are perturbed, whether to use walls and lambda
 using EwaldTestParameters = std::tuple<bool, bool, real>;
@@ -225,9 +228,6 @@ public:
     }
 
 protected:
-    //! The scaling factor for the box along z with walls
-    static constexpr real c_wallEwaldZFactor = 3;
-
     t_inputrec ir_;
     bool       havePerturbedCharges_;
     bool       haveWalls_;
@@ -327,8 +327,11 @@ INSTANTIATE_TEST_SUITE_P(Perturbed,
                                             ::testing::Values(0.0, 0.4, 1.0)),
                          nameOfTest);
 
-//! Test fixture for the Ewald correction for systems with net charge, parametrized on lambda
-class EwaldChargeCorrectionTest : public ::testing::TestWithParam<real>
+//! Test parameters for the net-charge correction: whether to use walls and lambda
+using EwaldChargeCorrectionTestParameters = std::tuple<bool, real>;
+
+//! Test fixture for the Ewald correction for systems with net charge
+class EwaldChargeCorrectionTest : public ::testing::TestWithParam<EwaldChargeCorrectionTestParameters>
 {
 public:
     //! Output of the correction
@@ -343,14 +346,22 @@ public:
     };
 
     //! Computes the correction for \c box and \c lambda
-    static Output computeCorrection(const matrix box, const real lambda)
+    static Output computeCorrection(const bool haveWalls, const matrix box, const real lambda)
     {
         // The net charge in states A and B
         const std::array<double, 2> chargeSum = { 3.0, -2.0 };
 
         Output output;
-        output.energy = ewald_charge_correction(
-                nullptr, c_epsilonR, c_ewaldCoefficient, chargeSum, lambda, box, &output.dvdlambda, output.virial);
+        output.energy = ewald_charge_correction(nullptr,
+                                                haveWalls,
+                                                c_wallEwaldZFactor,
+                                                c_epsilonR,
+                                                c_ewaldCoefficient,
+                                                chargeSum,
+                                                lambda,
+                                                box,
+                                                &output.dvdlambda,
+                                                output.virial);
 
         return output;
     }
@@ -364,7 +375,7 @@ TEST_P(EwaldChargeCorrectionTest, DerivativesMatchEnergy)
                         "precision";
     }
 
-    const real lambda = GetParam();
+    const auto [haveWalls, lambda] = GetParam();
 
     matrix box  = { { 0 } };
     box[XX][XX] = 2.0;
@@ -374,11 +385,12 @@ TEST_P(EwaldChargeCorrectionTest, DerivativesMatchEnergy)
     box[ZZ][YY] = 0.5;
     box[ZZ][ZZ] = 3.0;
 
-    const Output output = computeCorrection(box, lambda);
+    const Output output = computeCorrection(haveWalls, box, lambda);
 
-    checkDvdlambdaMatchesEnergy(output.dvdlambda,
-                                [&](const double lambdaChange)
-                                { return computeCorrection(box, lambda + lambdaChange).energy; });
+    checkDvdlambdaMatchesEnergy(
+            output.dvdlambda,
+            [&](const double lambdaChange)
+            { return computeCorrection(haveWalls, box, lambda + lambdaChange).energy; });
 
     // The correction does not depend on the coordinates
     const std::vector<RVec> x;
@@ -386,10 +398,125 @@ TEST_P(EwaldChargeCorrectionTest, DerivativesMatchEnergy)
                                    box,
                                    output.virial,
                                    [&](ArrayRef<const RVec> /* x */, const matrix boxTrial)
-                                   { return computeCorrection(boxTrial, lambda).energy; });
+                                   { return computeCorrection(haveWalls, boxTrial, lambda).energy; });
 }
 
-INSTANTIATE_TEST_SUITE_P(Lambda, EwaldChargeCorrectionTest, ::testing::Values(0.0, 0.4, 1.0));
+INSTANTIATE_TEST_SUITE_P(Lambda,
+                         EwaldChargeCorrectionTest,
+                         ::testing::Combine(::testing::Bool(), ::testing::Values(0.0, 0.4, 1.0)));
+
+//! Test fixture for the total Ewald energy of a system with net charge, parametrized on using walls
+class EwaldNetChargeTest : public ::testing::TestWithParam<bool>
+{
+public:
+    /*! \brief Returns the total electrostatic energy using Ewald coefficient \c ewaldCoefficient
+     *
+     * Sums the reciprocal part, the direct-space part, the self
+     * interaction and the correction for the net charge, all converged
+     * to high accuracy.
+     */
+    double totalEnergy(const real ewaldCoefficient) const
+    {
+        const bool haveWalls = GetParam();
+
+        matrix box  = { { 0 } };
+        box[XX][XX] = 2.0;
+        box[YY][YY] = 2.5;
+        box[ZZ][ZZ] = 3.0;
+
+        t_inputrec ir;
+        ir.nkx = 14;
+        ir.nky = 16;
+        ir.nkz = (haveWalls ? 60 : 20);
+        gmx_ewald_tab_t   ewaldTable(ir, nullptr);
+        std::vector<RVec> forces(x_.size(), { 0.0_real, 0.0_real, 0.0_real });
+        matrix            virial;
+        real              dvdlambda        = 0;
+        const double      reciprocalEnergy = do_ewald(haveWalls,
+                                                 c_wallEwaldZFactor,
+                                                 c_epsilonR,
+                                                 FreeEnergyPerturbationType::No,
+                                                 x_,
+                                                 forces,
+                                                 charges_,
+                                                 charges_,
+                                                 box,
+                                                 nullptr,
+                                                 x_.size(),
+                                                 virial,
+                                                 ewaldCoefficient,
+                                                 0,
+                                                 &dvdlambda,
+                                                 &ewaldTable);
+
+        // The Ewald unit cell is elongated along z with walls
+        const double unitCellZ = box[ZZ][ZZ] * (haveWalls ? c_wallEwaldZFactor : 1);
+
+        const double coulombFactor = c_one4PiEps0 / c_epsilonR;
+        double       directEnergy  = 0;
+        double       chargeSum     = 0;
+        double       selfEnergy    = 0;
+        for (size_t i = 0; i < x_.size(); i++)
+        {
+            chargeSum += charges_[i];
+            selfEnergy -= coulombFactor * ewaldCoefficient / std::sqrt(M_PI) * charges_[i] * charges_[i];
+            for (size_t j = 0; j < x_.size(); j++)
+            {
+                for (int imageX = -4; imageX <= 4; imageX++)
+                {
+                    for (int imageY = -4; imageY <= 4; imageY++)
+                    {
+                        for (int imageZ = -3; imageZ <= 3; imageZ++)
+                        {
+                            if (i == j && imageX == 0 && imageY == 0 && imageZ == 0)
+                            {
+                                continue;
+                            }
+                            const double dx = x_[i][XX] - x_[j][XX] + imageX * box[XX][XX];
+                            const double dy = x_[i][YY] - x_[j][YY] + imageY * box[YY][YY];
+                            const double dz = x_[i][ZZ] - x_[j][ZZ] + imageZ * unitCellZ;
+                            const double r  = std::sqrt(dx * dx + dy * dy + dz * dz);
+                            directEnergy += 0.5 * coulombFactor * charges_[i] * charges_[j]
+                                            * std::erfc(ewaldCoefficient * r) / r;
+                        }
+                    }
+                }
+            }
+        }
+
+        matrix                      virialCorrection = { { 0 } };
+        const std::array<double, 2> chargeSums       = { chargeSum, chargeSum };
+        const double                chargeCorrection = ewald_charge_correction(
+                nullptr, haveWalls, c_wallEwaldZFactor, c_epsilonR, ewaldCoefficient, chargeSums, 0, box, &dvdlambda, virialCorrection);
+
+        return reciprocalEnergy + directEnergy + selfEnergy + chargeCorrection;
+    }
+
+protected:
+    //! Coordinates
+    std::vector<RVec> x_ = { { 0.5, 1.0, 0.2 }, { 1.7, 0.3, 1.4 }, { 1.0, 2.0, 0.5 },
+                             { 1.5, 1.5, 2.1 }, { 0.3, 2.2, 2.7 }, { 1.2, 0.8, 1.1 } };
+    //! Charges, with net charge
+    std::vector<real> charges_ = { 0.5, -1.0, 0.7, 0.4, -0.8, 0.3 };
+};
+
+TEST_P(EwaldNetChargeTest, TotalEnergyDoesNotDependOnEwaldCoefficient)
+{
+    if (!GMX_DOUBLE)
+    {
+        GTEST_SKIP() << "The sum of the Ewald contributions is only accurate enough in double "
+                        "precision";
+    }
+
+    // The splitting of the interactions over direct and reciprocal space should
+    // not affect the total energy. With net charge this only holds when
+    // the correction for the uniform background charge is included.
+    const double energy = totalEnergy(2.0);
+    EXPECT_REAL_EQ_TOL(totalEnergy(2.5), energy, absoluteTolerance(1e-6));
+    EXPECT_REAL_EQ_TOL(totalEnergy(3.0), energy, absoluteTolerance(1e-6));
+}
+
+INSTANTIATE_TEST_SUITE_P(Walls, EwaldNetChargeTest, ::testing::Bool());
 
 } // namespace
 } // namespace test

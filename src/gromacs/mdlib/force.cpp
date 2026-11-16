@@ -242,6 +242,8 @@ void CpuPpLongRangeNonbondeds::calculate(gmx_pme_t*                     pmedata,
                    negligible and constant-sized amount of time */
                 ewaldOutput.Vcorr_q += ewald_charge_correction(
                         commrec->dd,
+                        havePbcXY2Walls_,
+                        wallEwaldZfac_,
                         epsilonR_,
                         ewaldCoeffQ_,
                         chargeC6Sum_,
