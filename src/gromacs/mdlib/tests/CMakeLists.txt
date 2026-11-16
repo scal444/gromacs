@@ -51,6 +51,7 @@ gmx_add_unit_test(MdlibUnitTest mdlib-test HARDWARE_DETECTION
         updategroups.cpp
         updategroupscog.cpp
         vsite.cpp
+        wall.cpp
     GPU_CPP_SOURCE_FILES
         constr.cpp
         leapfrog.cpp

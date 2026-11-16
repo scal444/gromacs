@@ -86,3 +86,18 @@ The shift forces of angle restraints had the wrong sign. This led to
 an incorrect virial, and thus pressure, when the two atoms defining a
 restraint vector were in different periodic images. Forces and energies
 were correct.
+
+Correct wall energies and dV/dlambda with wall-r-linpot and perturbed atoms
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With perturbed atoms closer to a wall than :mdp:`wall-r-linpot`,
+the linear part of the wall potential was scaled twice with the lambda
+factor. This led to incorrect wall energies and dV/dlambda. Forces were
+correct.
+
+Correct wall virial with wall-r-linpot
+""""""""""""""""""""""""""""""""""""""
+
+For atoms closer to a wall than :mdp:`wall-r-linpot`, the virial was computed
+using that distance instead of the actual distance to the wall, which led
+to an incorrect pressure along z.

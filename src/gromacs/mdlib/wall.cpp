@@ -260,6 +260,8 @@ real do_walls(const t_inputrec&                   ir,
                     {
                         r = wall_z[1] - x[i][ZZ];
                     }
+                    // The distance before applying the linear potential
+                    const real rActual = r;
                     if (r < ir.wall_r_linpot)
                     {
                         mr = ir.wall_r_linpot - r;
@@ -280,7 +282,6 @@ real do_walls(const t_inputrec&                   ir,
                     {
                         case WallType::Table:
                             tableForce(r, *fr.wall_tab[w][cENER[i]], Cd, Cr, &V, &F);
-                            F *= lamfac;
                             break;
                         case WallType::NineThree:
                             r1 = 1 / r;
@@ -289,7 +290,7 @@ real do_walls(const t_inputrec&                   ir,
                             Vd = fac_d[w] * Cd * r2 * r1;
                             Vr = fac_r[w] * Cr * r4 * r4 * r1;
                             V  = Vr - Vd;
-                            F  = lamfac * (9 * Vr - 3 * Vd) * r1;
+                            F  = (9 * Vr - 3 * Vd) * r1;
                             break;
                         case WallType::TenFour:
                             r1 = 1 / r;
@@ -298,7 +299,7 @@ real do_walls(const t_inputrec&                   ir,
                             Vd = fac_d[w] * Cd * r4;
                             Vr = fac_r[w] * Cr * r4 * r4 * r2;
                             V  = Vr - Vd;
-                            F  = lamfac * (10 * Vr - 4 * Vd) * r1;
+                            F  = (10 * Vr - 4 * Vd) * r1;
                             break;
                         case WallType::TwelveSix:
                             r1 = 1 / r;
@@ -307,7 +308,7 @@ real do_walls(const t_inputrec&                   ir,
                             Vd = Cd * r4 * r2;
                             Vr = Cr * r4 * r4 * r4;
                             V  = Vr - Vd;
-                            F  = lamfac * (12 * Vr - 6 * Vd) * r1;
+                            F  = (12 * Vr - 6 * Vd) * r1;
                             break;
                         default:
                             V = 0;
@@ -318,7 +319,11 @@ real do_walls(const t_inputrec&                   ir,
                     {
                         V += mr * F;
                     }
-                    sumRF += r * F;
+                    // Both V and F are scaled by lamfac, V is scaled below
+                    F *= lamfac;
+                    // The force is constant for distances below wall_r_linpot,
+                    // so the virial needs the actual distance.
+                    sumRF += rActual * F;
                     if (w == 1)
                     {
                         F = -F;
