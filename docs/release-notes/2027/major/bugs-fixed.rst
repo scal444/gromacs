@@ -57,3 +57,13 @@ Below are issues fixed in the (`Colvars <https://colvars.github.io>`_) library (
 
 - Improved restart consistency and fixes for multi-replica well-tempered metadynamics (Colvars repo pull request `820 <https://github.com/Colvars/colvars/pull/820>`_)
 - Fixed wrapping of extended-system variable coupled to orientationAngle (Colvars repo pull request `943 <https://github.com/Colvars/colvars/pull/943>`_)
+
+Correct pull forces on groups with cosine weighting
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With COM pulling using a pull group with cosine weighting
+(``pull-group?-pbcatom = -1``), the forces on the atoms of that group
+were scaled by a factor that, depending on the location of the group in
+the box, was up to 25% smaller than one. The pull energy and the forces
+on other pull groups were correct, so the pull forces were not conservative
+and did not sum to zero.
