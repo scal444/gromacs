@@ -494,10 +494,15 @@ struct KernelOutput
     std::vector<real> vVdw;
     //! The Coulomb energies for each energy-group pair
     std::vector<real> vCoulomb;
+    //! The shift forces, only set when requested
+    std::vector<RVec> shiftForces;
 };
 
 //! Sets up the pair search and pairlist for \c system, calls the kernel and returns its output
-KernelOutput runKernel(const KernelOptions& options, const TestSystem& system, const interaction_const_t& ic)
+KernelOutput runKernel(const KernelOptions&       options,
+                       const TestSystem&          system,
+                       const interaction_const_t& ic,
+                       const bool                 computeShiftForces = false)
 {
     std::unique_ptr<nonbonded_verlet_t> nbv = setupNbnxmForBenchInstance(options, system);
     nbv->constructPairlist(InteractionLocality::Local, system.excls, false, 0, nullptr);
@@ -508,6 +513,7 @@ KernelOutput runKernel(const KernelOptions& options, const TestSystem& system, c
     StepWorkload stepWork;
     stepWork.computeForces = true;
     stepWork.computeEnergy = options.energyHandling != EnergyHandling::NoEnergies;
+    stepWork.computeVirial = computeShiftForces;
 
     KernelOutput output;
     output.vVdw.resize(square(sc_numEnergyGroups[options.energyHandling]));
@@ -541,6 +547,12 @@ KernelOutput runKernel(const KernelOptions& options, const TestSystem& system, c
     else
     {
         output.forces = nbnxmForces;
+    }
+
+    if (computeShiftForces)
+    {
+        output.shiftForces.resize(c_numShiftVectors, { 0.0_real, 0.0_real, 0.0_real });
+        nbnxm_atomdata_add_nbat_fshift_to_fshift(nbv->nbat(), output.shiftForces);
     }
 
     return output;
@@ -788,6 +800,30 @@ TEST_P(NbnxmKernelDerivativesTest, ForcesMatchEnergy)
     };
 
     checkForcesMatchEnergy(coordinatesToCheck, forcesToCheck, energy);
+
+    // Check the virial. The pair search only supports rectangular boxes.
+    const KernelOutput       outputWithShiftForces = runKernel(options, system, ic, true);
+    FiniteDifferenceSettings settings;
+    settings.onlyDiagonalStrain = true;
+    // Straining the system moves pairs over the cut-off, where the force is,
+    // unlike the potential, not always zero, which affects the numerical derivative.
+    settings.relativeTolerance = 5e-4;
+    checkVirialMatchesEnergy(
+            system.coordinates,
+            system.box,
+            DIM,
+            outputWithShiftForces.forces,
+            outputWithShiftForces.shiftForces,
+            [&](ArrayRef<const RVec> xTrial, const matrix boxTrial) -> double
+            {
+                TestSystem strainedSystem = system;
+                std::copy(xTrial.begin(), xTrial.end(), strainedSystem.coordinates.begin());
+                copy_mat(boxTrial, strainedSystem.box);
+                const KernelOutput trialOutput = runKernel(options, strainedSystem, ic);
+                return std::accumulate(trialOutput.vVdw.begin(), trialOutput.vVdw.end(), 0.0)
+                       + std::accumulate(trialOutput.vCoulomb.begin(), trialOutput.vCoulomb.end(), 0.0);
+            },
+            settings);
 }
 
 INSTANTIATE_TEST_SUITE_P(

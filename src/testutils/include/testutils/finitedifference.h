@@ -113,6 +113,10 @@ struct FiniteDifferenceSettings
      * This needs to be increased when the energy is not a smooth function,
      * e.g. because it is interpolated from a table. */
     double relativeTolerance = 1e-7;
+    /*! \brief Whether to only use strains along the box diagonal for checking the virial
+     *
+     * Needed when the code under test only supports rectangular boxes. */
+    bool onlyDiagonalStrain = false;
 };
 
 /*! \brief Returns the tolerance for comparing with a numerical derivative of an energy
@@ -223,7 +227,8 @@ void checkVirialMatchesEnergy(ArrayRef<const RVec>            x,
     double                                   maxElement         = 1.0;
     for (int forceDim = 0; forceDim < DIM; forceDim++)
     {
-        for (int distanceDim = forceDim; distanceDim < DIM; distanceDim++)
+        const int endDim = (settings.onlyDiagonalStrain ? forceDim + 1 : DIM);
+        for (int distanceDim = forceDim; distanceDim < endDim; distanceDim++)
         {
             double& element = forceTimesDistance[forceDim][distanceDim];
             for (Index atom = 0; atom < x.ssize(); atom++)
@@ -243,7 +248,8 @@ void checkVirialMatchesEnergy(ArrayRef<const RVec>            x,
     std::vector<RVec> xTrial(x.begin(), x.end());
     for (int forceDim = 0; forceDim < DIM; forceDim++)
     {
-        for (int distanceDim = forceDim; distanceDim < DIM; distanceDim++)
+        const int endDim = (settings.onlyDiagonalStrain ? forceDim + 1 : DIM);
+        for (int distanceDim = forceDim; distanceDim < endDim; distanceDim++)
         {
             const real numericalElement = -finiteDifferenceDerivative(
                     [&](const double strain)
