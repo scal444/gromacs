@@ -89,7 +89,7 @@ void ThreadForceBuffer<ForceBufferElementType>::clearForcesAndEnergies()
 
     std::fill(energyTerms_.begin(), energyTerms_.end(), 0.0_real);
 
-    diagonalVirial_ = { 0.0_real, 0.0_real, 0.0_real };
+    clear_mat(virial_);
 
     for (int i = 0; i < static_cast<int>(NonBondedEnergyTerms::Count); i++)
     {
@@ -351,7 +351,7 @@ void reduceVirialData(ForceWithVirial* forceWithVirial,
 {
     for (const auto& threadForceBuffer : threadForceBuffers)
     {
-        forceWithVirial->addVirialContribution(threadForceBuffer->diagonalVirial());
+        forceWithVirial->addVirialContribution(threadForceBuffer->virial());
     }
 }
 

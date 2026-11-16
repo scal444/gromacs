@@ -78,7 +78,7 @@ real posres_wrapper(gmx::ArrayRef<const int>            iatoms,
                     gmx::ArrayRef<gmx::RVec>            centersOfMassScaledBuffer,
                     gmx::ArrayRef<gmx::RVec>            centersOfMassBScaledBuffer,
                     gmx::ArrayRef<rvec4>                forces,
-                    gmx::RVec*                          virial,
+                    rvec*                               virial,
                     real*                               dvdl);
 
 /*! \brief Helper function that wraps calls to posres for free-energy
@@ -106,6 +106,6 @@ real fbposres_wrapper(gmx::ArrayRef<const int>            iatoms,
                       gmx::ArrayRef<const unsigned short> refScaleComIndices,
                       gmx::ArrayRef<gmx::RVec>            centersOfMassScaledBuffer,
                       gmx::ArrayRef<rvec4>                forces,
-                      gmx::RVec*                          virial);
+                      rvec*                               virial);
 
 #endif

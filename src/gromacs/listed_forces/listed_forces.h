@@ -271,7 +271,7 @@ private:
                                      const rvec                    x[],
                                      const t_pbc&                  pbc,
                                      gmx::ArrayRef<const unsigned short> refScaleComIndices,
-                                     gmx::RVec*                          virial,
+                                     rvec*                               virial,
                                      gmx_enerdata_t*                     enerd,
                                      gmx::ArrayRef<const real>           lambda,
                                      gmx::ArrayRef<real>                 dvdl);

@@ -297,3 +297,13 @@ ignored the off-diagonal elements of the box. This silently gave incorrect
 energies, forces and virial with triclinic boxes, including the rhombic
 dodecahedron and truncated octahedron. Rectangular boxes and PME were not
 affected.
+
+Add missing off-diagonal virial of position restraints
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Only the diagonal elements of the virial of position restraints and
+flat-bottomed position restraints were computed, so the off-diagonal
+elements of the pressure tensor lacked the contribution of the restraints.
+This affected the reported off-diagonal pressure and pressure coupling of
+the off-diagonal box elements. The diagonal pressure, and thus isotropic
+and semi-isotropic pressure coupling, were correct.

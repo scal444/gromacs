@@ -150,8 +150,8 @@ protected:
         real dvdlambda = 0;
         //! The forces
         std::vector<RVec> forces;
-        //! The diagonal of the virial
-        RVec virial = { 0.0_real, 0.0_real, 0.0_real };
+        //! The virial
+        matrix virial = { { 0.0_real } };
     };
 
     /*! \brief Calls the kernel for (flat-bottomed) position restraints in \c idef_
@@ -189,7 +189,7 @@ protected:
                                            centersOfMassScaledBuffer,
                                            centersOfMassBScaledBuffer,
                                            forces,
-                                           &output.virial,
+                                           output.virial,
                                            &output.dvdlambda);
         }
         else
@@ -203,7 +203,7 @@ protected:
                     {},
                     centersOfMassScaledBuffer,
                     forces,
-                    &output.virial);
+                    output.virial);
         }
         for (const rvec4& force : forces)
         {
@@ -234,38 +234,49 @@ protected:
                 [&](const double lambdaChange)
                 { return runKernel(functionType, x, box_, lambda + lambdaChange).energy; });
 
-        // Scaling the coordinates and box along a periodic dimension changes
-        // the energy by twice the corresponding diagonal virial element.
+        // A strain that displaces coordinates and box along periodic dimension
+        // strainDim proportional to periodic dimension distanceDim changes the
+        // energy by twice the corresponding virial element. Only strains that keep
+        // the box lower triangular can be applied.
         // The kernel takes care of how the reference positions scale.
         const FiniteDifferenceSettings settings;
-        for (int d = 0; d < numPbcDimensions(pbcType_); d++)
+        const int                      numPeriodicDimensions = numPbcDimensions(pbcType_);
+        for (int strainDim = 0; strainDim < numPeriodicDimensions; strainDim++)
         {
-            const real numericalVirial =
-                    0.5
-                    * finiteDifferenceDerivative(
-                            [&](const double strain)
-                            {
-                                std::vector<RVec> xTrial(x.begin(), x.end());
-                                for (RVec& xAtom : xTrial)
+            for (int distanceDim = strainDim; distanceDim < numPeriodicDimensions; distanceDim++)
+            {
+                const real numericalVirial =
+                        0.5
+                        * finiteDifferenceDerivative(
+                                [&](const double strain)
                                 {
-                                    xAtom[d] *= 1 + strain;
-                                }
-                                matrix boxTrial;
-                                copy_mat(box_, boxTrial);
-                                boxTrial[d][d] *= 1 + strain;
-                                return runKernel(functionType, xTrial, boxTrial, lambda).energy;
-                            },
-                            settings.strainStep);
-            EXPECT_REAL_EQ_TOL(output.virial[d],
-                               numericalVirial,
-                               finiteDifferenceTolerance(
-                                       std::max(1.0, std::abs(static_cast<double>(output.virial[d]))),
-                                       settings.relativeTolerance,
-                                       std::abs(output.energy),
-                                       settings.strainStep))
-                    << "Virial does not match the derivative of the energy with respect to "
-                       "scaling dimension "
-                    << d;
+                                    std::vector<RVec> xTrial(x.begin(), x.end());
+                                    for (RVec& xAtom : xTrial)
+                                    {
+                                        xAtom[strainDim] += strain * xAtom[distanceDim];
+                                    }
+                                    matrix boxTrial;
+                                    copy_mat(box_, boxTrial);
+                                    for (int boxVector = 0; boxVector < DIM; boxVector++)
+                                    {
+                                        boxTrial[boxVector][strainDim] +=
+                                                strain * box_[boxVector][distanceDim];
+                                    }
+                                    return runKernel(functionType, xTrial, boxTrial, lambda).energy;
+                                },
+                                settings.strainStep);
+                const real virial = output.virial[distanceDim][strainDim];
+                EXPECT_REAL_EQ_TOL(
+                        virial,
+                        numericalVirial,
+                        finiteDifferenceTolerance(std::max(1.0, std::abs(static_cast<double>(virial))),
+                                                  settings.relativeTolerance,
+                                                  std::abs(output.energy),
+                                                  settings.strainStep))
+                        << "Virial does not match the derivative of the energy with respect to "
+                           "strain element "
+                        << strainDim << "," << distanceDim;
+            }
         }
     }
 
@@ -319,8 +330,8 @@ TEST_P(PositionRestraintsTest, BasicPosResNoFreeEnergy)
             f[d] = 0;
         }
     }
-    real dvdl   = 0;
-    RVec virial = { 0.0_real, 0.0_real, 0.0_real };
+    real   dvdl   = 0;
+    matrix virial = { { 0.0_real } };
 
     const real v = posres_wrapper(idef_.il[InteractionFunction::PositionRestraints].iatoms,
                                   idef_.iparams_posres,
@@ -332,7 +343,7 @@ TEST_P(PositionRestraintsTest, BasicPosResNoFreeEnergy)
                                   centersOfMassScaledBuffer,
                                   centersOfMassBScaledBuffer,
                                   forces,
-                                  &virial,
+                                  virial,
                                   &dvdl);
     // Copy from 4-component vector buffer to forceWithVirial
     for (Index i = 0; i < gmx::ssize(forces); i++)

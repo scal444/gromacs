@@ -391,7 +391,7 @@ void ListedForces::calcPositionRestraintForces(const InteractionDefinitions& ide
                                                const rvec   x[],
                                                const t_pbc& pbc,
                                                gmx::ArrayRef<const unsigned short> refScaleComIndices,
-                                               gmx::RVec*                virial,
+                                               rvec*                     virial,
                                                gmx_enerdata_t*           enerd,
                                                gmx::ArrayRef<const real> lambda,
                                                gmx::ArrayRef<real>       dvdl)
@@ -414,7 +414,7 @@ void ListedForces::calcPositionRestraintForces(const InteractionDefinitions& ide
             // Thread 0 write directly to the output buffers
             gmx::EnumerationArray<InteractionFunction, real>& epot =
                     (thread == 0 ? enerd->term : threadBuffer.energyTerms());
-            gmx::RVec&          virialRef = (thread == 0 ? *virial : threadBuffer.diagonalVirial());
+            rvec*               virialRef = (thread == 0 ? virial : threadBuffer.virial());
             gmx::ArrayRef<real> dvdlRef   = (thread == 0 ? dvdl : threadBuffer.dvdl());
 
             if (!idef.il[InteractionFunction::PositionRestraints].empty())
@@ -437,7 +437,7 @@ void ListedForces::calcPositionRestraintForces(const InteractionDefinitions& ide
                                        comBuffers.comA_,
                                        comBuffers.comB_,
                                        forces,
-                                       &virialRef,
+                                       virialRef,
                                        &dvdlRef[int(FreeEnergyPerturbationCouplingType::Restraint)]);
             }
 
@@ -452,7 +452,7 @@ void ListedForces::calcPositionRestraintForces(const InteractionDefinitions& ide
                         bound1 - bound0);
 
                 epot[InteractionFunction::FlatBottomedPositionRestraints] += fbposres_wrapper(
-                        iatoms, idef.iparams_fbposres, pbc, x, fr_, refScaleComIndices, comBuffers.comA_, forces, &virialRef);
+                        iatoms, idef.iparams_fbposres, pbc, x, fr_, refScaleComIndices, comBuffers.comA_, forces, virialRef);
             }
         }
         GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
@@ -778,7 +778,7 @@ void ListedForces::calculate(const matrix                              box,
             t_pbc pbcPositionRestraints;
             set_pbc(&pbcPositionRestraints, fr_.pbcType, box);
 
-            gmx::RVec diagonalVirial = { 0.0_real, 0.0_real, 0.0_real };
+            matrix virial = { { 0.0_real } };
             // We need an intermediate array (with real=float) as enerd stores doubles
             gmx::EnumerationArray<FreeEnergyPerturbationCouplingType, real> dvdl = { 0 };
             calcPositionRestraintForces(idef,
@@ -786,14 +786,14 @@ void ListedForces::calculate(const matrix                              box,
                                         x,
                                         pbcPositionRestraints,
                                         restraintComIndices_,
-                                        &diagonalVirial,
+                                        virial,
                                         enerd,
                                         lambda,
                                         dvdl);
 
             if (stepWork.computeVirial)
             {
-                forceOutputs->forceWithVirial().addVirialContribution(diagonalVirial);
+                forceOutputs->forceWithVirial().addVirialContribution(virial);
 
                 threading_->threadedForceBuffers_.reduce(
                         &forceOutputs->forceWithVirial(), &enerd->term, &enerd->grpp, dvdl, stepWork, 1);

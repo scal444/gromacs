@@ -18,17 +18,17 @@
     <Int Name="Length">3</Int>
     <Vector>
       <Real Name="X">0</Real>
-      <Real Name="Y">0</Real>
-      <Real Name="Z">0</Real>
+      <Real Name="Y">-3.9999999999999996</Real>
+      <Real Name="Z">-40.000000000000014</Real>
     </Vector>
     <Vector>
       <Real Name="X">0</Real>
       <Real Name="Y">-5</Real>
-      <Real Name="Z">0</Real>
+      <Real Name="Z">-50.000000000000014</Real>
     </Vector>
     <Vector>
       <Real Name="X">0</Real>
-      <Real Name="Y">0</Real>
+      <Real Name="Y">5</Real>
       <Real Name="Z">50</Real>
     </Vector>
   </Sequence>

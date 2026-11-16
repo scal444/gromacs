@@ -148,8 +148,8 @@ public:
     //! Returns a view of the shift force buffer
     ArrayRef<RVec> shiftForces() { return shiftForces_; }
 
-    //! Returns a reference to the diagonal virial
-    gmx::RVec& diagonalVirial() { return diagonalVirial_; }
+    //! Returns a reference to the virial for contributions that are not computed through shift forces
+    matrix& virial() { return virial_; }
 
     //! Returns a view of the energy terms, size InteractionFunction::Count
     gmx::EnumerationArray<InteractionFunction, real>& energyTerms() { return energyTerms_; }
@@ -177,8 +177,8 @@ private:
 
     //! Shift force array, size c_numShiftVectors
     std::vector<RVec> shiftForces_;
-    //! Virial buffer for diagonal only contributions
-    gmx::RVec diagonalVirial_;
+    //! Virial buffer for contributions that are not computed through shift forces
+    matrix virial_ = { { 0.0_real } };
     //! Energy array, can be empty
     gmx::EnumerationArray<InteractionFunction, real> energyTerms_;
     //! Group pair energy data for pairs

@@ -191,7 +191,7 @@ real fbposres(int                                       nbonds,
               const t_iparams                           forceparams[],
               const rvec                                x[],
               rvec4*                                    forces,
-              gmx::RVec*                                virial,
+              rvec*                                     virial,
               const t_pbc&                              pbc,
               RefCoordScaling                           refcoord_scaling,
               PbcType                                   pbcType,
@@ -319,8 +319,14 @@ real fbposres(int                                       nbonds,
         for (int m = 0; (m < DIM); m++)
         {
             forces[ai][m] += fm[m];
-            /* Here we correct for the pbc_dx which included rdist */
-            (*virial)[m] -= 0.5 * (dx[m] + rdist[m]) * fm[m];
+            /* Here we correct for the pbc_dx which included rdist.
+             * As the force is in general not parallel to the distance,
+             * we need all elements of the virial.
+             */
+            for (int d = 0; d < DIM; d++)
+            {
+                virial[d][m] -= 0.5 * (dx[d] + rdist[d]) * fm[m];
+            }
         }
     }
 
@@ -338,7 +344,7 @@ real posres(int                                       nbonds,
             const t_iparams                           forceparams[],
             const rvec                                x[],
             rvec4*                                    forces,
-            gmx::RVec*                                virial,
+            rvec*                                     virial,
             const struct t_pbc&                       pbc,
             real                                      lambda,
             real*                                     dvdlambda,
@@ -417,7 +423,14 @@ real posres(int                                       nbonds,
             if (computeForce)
             {
                 forces[ai][m] += fm;
-                (*virial)[m] -= 0.5 * (dx[m] + rdist[m]) * fm;
+                /* With different force constants along the dimensions
+                 * the force is not parallel to the distance, so we need
+                 * all elements of the virial.
+                 */
+                for (int d = 0; d < DIM; d++)
+                {
+                    virial[d][m] -= 0.5 * (dx[d] + rdist[d]) * fm;
+                }
             }
         }
     }
@@ -437,7 +450,7 @@ real posres_wrapper(gmx::ArrayRef<const int>                  iatoms,
                     gmx::ArrayRef<gmx::RVec>                  centersOfMassScaledBuffer,
                     gmx::ArrayRef<gmx::RVec>                  centersOfMassBScaledBuffer,
                     gmx::ArrayRef<rvec4>                      forces,
-                    gmx::RVec*                                virial,
+                    rvec*                                     virial,
                     real*                                     dvdl)
 {
     return posres<true>(iatoms.size(),
@@ -509,7 +522,7 @@ real fbposres_wrapper(gmx::ArrayRef<const int>                  iatoms,
                       const gmx::ArrayRef<const unsigned short> refScaleComIndices,
                       gmx::ArrayRef<gmx::RVec>                  centersOfMassScaledBuffer,
                       gmx::ArrayRef<rvec4>                      forces,
-                      gmx::RVec*                                virial)
+                      rvec*                                     virial)
 {
     return fbposres(iatoms.size(),
                     iatoms.data(),
