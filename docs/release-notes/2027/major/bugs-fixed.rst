@@ -67,3 +67,11 @@ were scaled by a factor that, depending on the location of the group in
 the box, was up to 25% smaller than one. The pull energy and the forces
 on other pull groups were correct, so the pull forces were not conservative
 and did not sum to zero.
+
+Correct the effective mass of cosine-weighted pull groups with constraint pulling
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The effective mass of a pull group with cosine weighting
+(``pull-group?-pbcatom = -1``) was underestimated by up to 25%,
+depending on the location of the group in the box.
+This affected the constraint force with constraint pulling.
