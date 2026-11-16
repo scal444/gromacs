@@ -101,3 +101,10 @@ Correct wall virial with wall-r-linpot
 For atoms closer to a wall than :mdp:`wall-r-linpot`, the virial was computed
 using that distance instead of the actual distance to the wall, which led
 to an incorrect pressure along z.
+
+Correct forces with Ewald geometry 3DC, net charge and perturbed charges
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With :mdp:`ewald-geometry` set to ``3dc``, a system with net charge and
+perturbed charges, the force correction for the net charge in the B state
+was not multiplied by the B-state charge of the atom.

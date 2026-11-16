@@ -173,7 +173,8 @@ void ewald_LRcorrection(const int                      numAtomsLocal,
             if (chargecorr[0] != 0 || chargecorr[1] != 0)
             {
                 forces[i][ZZ] +=
-                        (L1_q * chargecorr[0] * chargeA[i] + lambda_q * chargecorr[1]) * coords[i][ZZ];
+                        (L1_q * chargecorr[0] * chargeA[i] + lambda_q * chargecorr[1] * chargeB[i])
+                        * coords[i][ZZ];
             }
         }
     }
