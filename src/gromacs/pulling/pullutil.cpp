@@ -781,8 +781,8 @@ void pull_calc_coms(const gmx::MpiComm&  mpiComm,
                 pgrp->wscale  = wmass / wwmass;
                 pgrp->invtm   = wwmass / (wmass * wmass);
                 /* Set the weights for the local atoms */
-                csw *= pgrp->invtm;
-                snw *= pgrp->invtm;
+                csw *= pgrp->mwscale;
+                snw *= pgrp->mwscale;
                 for (size_t i = 0; i < pgrp->atomSet_.numAtomsLocal(); i++)
                 {
                     int ii                = pgrp->atomSet_.localIndex()[i];
