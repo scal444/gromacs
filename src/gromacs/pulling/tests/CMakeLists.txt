@@ -34,5 +34,6 @@
 gmx_add_unit_test(PullTest  pull-test
     CPP_SOURCE_FILES
         pull.cpp
+        pull_cosine_weighting.cpp
         )
 target_link_libraries(pull-test PRIVATE pulling)
