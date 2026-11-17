@@ -65,3 +65,9 @@ With a pull group using cosine weighting (:mdp:`pull-group1-pbcatom` set
 to -1), the pull forces on the atoms of that group were too small. The size
 of the error depends on the extent and location of the group along the pull
 dimension. The pull energy and the forces on other pull groups were correct.
+
+Correct effective mass of pull groups with cosine weighting
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With a pull group using cosine weighting, the effective mass of the group
+was incorrect. This only affected constraint pulling.

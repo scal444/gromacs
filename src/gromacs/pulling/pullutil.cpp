@@ -773,7 +773,7 @@ void pull_calc_coms(const gmx::MpiComm&  mpiComm,
                 pgrp->x[pull->cosdim] = atan2_0_2pi(snw, csw) / twopi_box;
                 /* Set the weights for the local atoms */
                 wmass  = std::sqrt(csw * csw + snw * snw);
-                wwmass = (comBuffer[1][0] * csw * csw + comBuffer[1][1] * csw * snw
+                wwmass = (comBuffer[1][0] * csw * csw + 2 * comBuffer[1][1] * csw * snw
                           + comBuffer[1][2] * snw * snw)
                          / (wmass * wmass);
 
